@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Tic-Tac-Toe</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #050505; }
+        
+        #turn-container {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .player-badge {
+            padding: 8px 25px;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: white;
+            transition: all 0.4s ease;
+            opacity: 0.2;
+            transform: scale(0.9);
+            border: 2px solid transparent;
+        }
+        .player-badge.active {
+            opacity: 1;
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(255,255,255,0.2);
+        }
+        #p1-badge.active { background-color: #ff3333; border-color: #ff9999; }
+        #p2-badge.active { background-color: #3333ff; border-color: #9999ff; }
+        #p1-badge { border: 2px solid #ff3333; color: #ff3333; }
+        #p2-badge { border: 2px solid #3333ff; color: #3333ff; }
+
+        #message-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            text-align: center;
+            pointer-events: none;
+            z-index: 20;
+        }
+        #message {
+            font-size: 3.5rem;
+            font-weight: bold;
+            text-shadow: 0 0 30px rgba(0,0,0,1);
+            color: white;
+            margin: 0;
+            display: none;
+        }
+
+        #ui-bottom-right {
+            position: absolute;
+            bottom: 25px;
+            right: 25px;
+            z-index: 10;
+        }
+        button {
+            padding: 10px 18px;
+            font-size: 13px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.05);
+            color: rgba(255,255,255,0.6);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 4px;
+            transition: 0.2s;
+        }
+        button:hover { 
+            background: rgba(255,255,255,0.15); 
+            color: white;
+            border-color: rgba(255,255,255,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="turn-container">
+        <div id="p1-badge" class="player-badge active">PLAYER 1 (赤)</div>
+        <div id="p2-badge" class="player-badge">PLAYER 2 (青)</div>
+    </div>
+
+    <div id="message-container">
+        <h1 id="message"></h1>
+    </div>
+
+    <div id="ui-bottom-right">
+        <button onclick="resetGame()">ゲームをリセット</button>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let scene, camera, renderer, controls;
+        let cells = []; 
+        let boardState = Array(27).fill(null); 
+        let currentPlayer = 1;
+        let gameOver = false;
+        let isLastChanceMode = false;
+        let firstWinner = null;
+        
+        let is3DMode = false;
+        let transitionAlpha = 0; 
+        let mouseDownPos = new THREE.Vector2();
+
+        init();
+        animate();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050505);
+
+            // 2D初期状態: FOV 5, Y 100
+            camera = new THREE.PerspectiveCamera(5, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 100, 0); 
+            camera.up.set(0, 0, -1); 
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            scene.add(directionalLight);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.08;
+            // 右クリックドラッグ（パン）を無効化して不意な3D化を防ぐ
+            controls.enablePan = false;
+
+            const spacing = 1.1;   
+            const boxSize = 0.6;   
+            const geometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize);
+            
+            for (let y = 0; y < 3; y++) {
+                for (let z = 0; z < 3; z++) {
+                    for (let x = 0; x < 3; x++) {
+                        const edges = new THREE.EdgesGeometry(geometry);
+                        const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 });
+                        const wireframe = new THREE.LineSegments(edges, lineMat);
+                        const material = new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.03 });
+                        const cube = new THREE.Mesh(geometry, material);
+                        
+                        cube.position.set((x - 1) * spacing, -(y - 1) * spacing, (z - 1) * spacing);
+                        wireframe.position.copy(cube.position);
+                        cube.userData = { index: cells.length };
+                        
+                        scene.add(cube);
+                        scene.add(wireframe);
+                        cells.push(cube);
+                    }
+                }
+            }
+
+            window.addEventListener('pointerdown', (e) => mouseDownPos.set(e.clientX, e.clientY));
+            window.addEventListener('pointerup', onPointerUp);
+            window.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function onPointerMove(event) {
+            if (gameOver) return;
+            const mouse = new THREE.Vector2((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(cells);
+
+            let hoveredEmpty = false;
+            if (intersects.length > 0) {
+                if (boardState[intersects[0].object.userData.index] === null) hoveredEmpty = true;
+            }
+            document.body.style.cursor = hoveredEmpty ? 'pointer' : 'default';
+        }
+
+        function onPointerUp(event) {
+            if (gameOver) return;
+            const upPos = new THREE.Vector2(event.clientX, event.clientY);
+            if (mouseDownPos.distanceTo(upPos) > 5) return; // ドラッグ時は置かない
+
+            const mouse = new THREE.Vector2((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(cells);
+
+            if (intersects.length > 0) {
+                const target = intersects[0].object;
+                const idx = target.userData.index;
+                if (boardState[idx] === null) {
+                    placePiece(idx, target.position);
+                }
+            }
+        }
+
+        function placePiece(idx, position) {
+            boardState[idx] = currentPlayer;
+            
+            let piece;
+            if (currentPlayer === 1) {
+                piece = new THREE.Mesh(new THREE.SphereGeometry(0.3, 32, 32), new THREE.MeshPhongMaterial({ color: 0xff3333, shininess: 80 }));
+            } else {
+                piece = new THREE.Group();
+                const mat = new THREE.MeshPhongMaterial({ color: 0x3333ff, shininess: 80 });
+                const bar1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.65, 0.12), mat);
+                bar1.rotation.z = Math.PI / 4;
+                const bar2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.65, 0.12), mat);
+                bar2.rotation.z = -Math.PI / 4;
+                piece.add(bar1, bar2);
+                piece.rotation.x = Math.PI / 2;
+            }
+            piece.position.copy(position);
+            scene.add(piece);
+
+            if (isLastChanceMode) {
+                if (checkWin()) {
+                    showFinalMessage(`REVERSAL! PLAYER ${currentPlayer} WIN!`, "#ffff00");
+                } else {
+                    showFinalMessage(`PLAYER ${firstWinner} WIN!`, firstWinner === 1 ? "#ff6666" : "#6666ff");
+                }
+                gameOver = true;
+                return;
+            }
+
+            if (checkWin()) {
+                firstWinner = currentPlayer;
+                isLastChanceMode = true;
+                const m = document.getElementById('message');
+                m.innerText = `PLAYER ${firstWinner} WIN?`;
+                m.style.display = 'block';
+                m.style.color = firstWinner === 1 ? "#ff6666" : "#6666ff";
+                
+                currentPlayer = (currentPlayer === 1 ? 2 : 1);
+                updateUI();
+                return;
+            }
+
+            currentPlayer = (currentPlayer === 1 ? 2 : 1);
+            updateUI();
+        }
+
+        function showFinalMessage(text, color) {
+            const m = document.getElementById('message');
+            m.innerText = text;
+            m.style.color = color;
+            m.style.display = 'block';
+            document.getElementById('p1-badge').classList.remove('active');
+            document.getElementById('p2-badge').classList.remove('active');
+        }
+
+        function updateUI() {
+            document.getElementById('p1-badge').className = 'player-badge' + (currentPlayer === 1 ? ' active' : '');
+            document.getElementById('p2-badge').className = 'player-badge' + (currentPlayer === 2 ? ' active' : '');
+        }
+
+        function checkWin() {
+            const lines = [];
+            const getIdx = (x, y, z) => x + z * 3 + y * 9; 
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    lines.push([getIdx(i, j, 0), getIdx(i, j, 1), getIdx(i, j, 2)]);
+                    lines.push([getIdx(i, 0, j), getIdx(i, 1, j), getIdx(i, 2, j)]);
+                    lines.push([getIdx(0, i, j), getIdx(1, i, j), getIdx(2, i, j)]);
+                }
+            }
+            for (let i = 0; i < 3; i++) {
+                lines.push([getIdx(i, 0, 0), getIdx(i, 1, 1), getIdx(i, 2, 2)], [getIdx(i, 0, 2), getIdx(i, 1, 1), getIdx(i, 2, 0)]);
+                lines.push([getIdx(0, i, 0), getIdx(1, i, 1), getIdx(2, i, 2)], [getIdx(0, i, 2), getIdx(1, i, 1), getIdx(2, i, 0)]);
+                lines.push([getIdx(0, 0, i), getIdx(1, 1, i), getIdx(2, 2, i)], [getIdx(0, 2, i), getIdx(1, 1, i), getIdx(2, 0, i)]);
+            }
+            lines.push([getIdx(0,0,0), getIdx(1,1,1), getIdx(2,2,2)], [getIdx(2,0,0), getIdx(1,1,1), getIdx(0,2,2)]);
+            lines.push([getIdx(0,2,0), getIdx(1,1,1), getIdx(2,0,2)], [getIdx(0,0,2), getIdx(1,1,1), getIdx(2,2,0)]);
+            
+            return lines.some(line => boardState[line[0]] && boardState[line[0]] === boardState[line[1]] && boardState[line[0]] === boardState[line[2]]);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 3D化のトリガー判定: カメラが中心軸(X, Z = 0)から外れたらドラッグされたとみなす
+            if (!is3DMode) {
+                if (Math.abs(camera.position.x) > 0.01 || Math.abs(camera.position.z) > 0.01) {
+                    is3DMode = true;
+                }
+            }
+            
+            // 3D移行アニメーション
+            if (is3DMode && transitionAlpha < 1) {
+                transitionAlpha += 0.04;
+                if (transitionAlpha > 1) transitionAlpha = 1;
+
+                camera.fov = THREE.MathUtils.lerp(5, 35, transitionAlpha);
+                // 見た目のサイズを維持するための高度調整
+                camera.position.y = THREE.MathUtils.lerp(100, 13.8, transitionAlpha);
+                camera.updateProjectionMatrix();
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.resetGame = () => location.reload();
+    </script>
+</body>
+</html>
