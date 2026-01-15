@@ -29,11 +29,33 @@
       justify-content: center;
     }
 
+    .game-card {
+      width: min(320px, 90vw);
+      background: #161616;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .game-card h2 {
+      margin: 0;
+      font-size: 1.3rem;
+    }
+
+    .game-card p {
+      margin: 0;
+      line-height: 1.6;
+      color: #d7d7d7;
+    }
+
     a.button {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 220px;
+      min-width: 200px;
       padding: 14px 20px;
       border-radius: 8px;
       text-decoration: none;
@@ -57,8 +79,22 @@
 <body>
   <h1>遊びたいマルバツゲームを選んでください</h1>
   <div class="button-group">
-    <a class="button" href="cheat.html">イカサマまるばつゲーム</a>
-    <a class="button secondary" href="3d.html">3Dまるばつゲーム</a>
+    <div class="game-card">
+      <h2>イカサマまるばつゲーム</h2>
+      <p>
+        ひと味違う勝負が楽しめるイカサマ版。先読みと仕掛けで、
+        相手の手を読んだり逆転を狙ったりできます。
+      </p>
+      <a class="button" href="cheat.html">ゲームへ進む</a>
+    </div>
+    <div class="game-card">
+      <h2>3Dまるばつゲーム</h2>
+      <p>
+        奥行きのある3D盤面で遊べるチャレンジモード。
+        見た目も操作も立体的で、戦略の幅が広がります。
+      </p>
+      <a class="button secondary" href="3d.html">ゲームへ進む</a>
+    </div>
   </div>
 </body>
 </html>
