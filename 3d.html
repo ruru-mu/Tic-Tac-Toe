@@ -55,12 +55,27 @@
             margin: 0;
             display: none;
         }
+        #hint-message {
+            position: absolute;
+            top: 70px;
+            width: 100%;
+            text-align: center;
+            font-size: 0.72rem;
+            color: rgba(255, 214, 170, 0.9);
+            text-shadow: 0 0 20px rgba(0,0,0,0.6);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+            z-index: 15;
+        }
 
         #ui-bottom-right {
             position: absolute;
             bottom: 25px;
             right: 25px;
             z-index: 10;
+            display: flex;
+            gap: 10px;
         }
         button {
             padding: 10px 18px;
@@ -89,9 +104,13 @@
     <div id="message-container">
         <h1 id="message"></h1>
     </div>
+    <div id="hint-message"></div>
 
     <div id="ui-bottom-right">
         <button onclick="resetGame()">ゲームをリセット</button>
+        <button id="cpu-toggle" onclick="toggleCpuMode()">CPUモード: OFF</button>
+        <button id="piece-limit-toggle" onclick="togglePieceLimitMode()">4個制限モード: OFF</button>
+        <button id="relocation-toggle" onclick="startRelocationMode()">後攻リロケート: OFF</button>
     </div>
 
     <script type="importmap">
@@ -115,9 +134,36 @@
         let isLastChanceMode = false;
         let firstWinner = null;
         
+        const BLOCKED_VALUE = 'blocked';
+        const CENTER_INDEX = 13;
+        const cpuPlayer = 2;
+        const humanPlayer = 1;
+        const MAX_CPU_LOOKAHEAD = 6;
+        const CPU_THINK_MIN_DELAY = 180;
+        const CPU_THINK_MAX_DELAY = 320;
+        const CPU_CENTER_WEIGHT = 11;
+        const CPU_CORNER_WEIGHT = 4;
+        const CORNER_INDICES = [0, 2, 6, 8, 18, 20, 24, 26];
+        const PRIORITY_CELLS = [...CORNER_INDICES];
+        let cpuMode = false;
+        let cpuTimeoutId = null;
+        const winningLines = generateWinningLines();
+        let pieceObjects = Array(27).fill(null);
+        const playerPlacementQueues = { 1: [], 2: [] };
+        const PIECE_LIMIT = 4;
+        let pieceLimitMode = false;
+        const blinkIntervals = { 1: null, 2: null };
+        const blinkTargets = { 1: null, 2: null };
+        let relocationUsed = false;
+        let relocationActive = false;
+        let relocationSourceIdx = null;
+        let cpuRelocationUsed = false;
+
         let is3DMode = false;
         let transitionAlpha = 0; 
         let mouseDownPos = new THREE.Vector2();
+        let hintTimeoutId = null;
+        let centerIndicator = null;
 
         init();
         animate();
@@ -172,6 +218,13 @@
                 }
             }
 
+            const centerCell = cells[CENTER_INDEX];
+            if (centerCell) {
+                centerIndicator = addCenterBlockIndicator(centerCell.position);
+                centerIndicator.visible = false;
+            }
+            if (cpuMode) blockCenterCell();
+
             window.addEventListener('pointerdown', (e) => mouseDownPos.set(e.clientX, e.clientY));
             window.addEventListener('pointerup', onPointerUp);
             window.addEventListener('pointermove', onPointerMove);
@@ -205,6 +258,14 @@
             if (intersects.length > 0) {
                 const target = intersects[0].object;
                 const idx = target.userData.index;
+                if (relocationActive) {
+                    handleRelocationClick(idx);
+                    return;
+                }
+                if (boardState[idx] === BLOCKED_VALUE && cpuMode) {
+                    showHint('中央のマスは使用できません。');
+                    return;
+                }
                 if (boardState[idx] === null) {
                     placePiece(idx, target.position);
                 }
@@ -213,6 +274,7 @@
 
         function placePiece(idx, position) {
             boardState[idx] = currentPlayer;
+            const placedPlayer = currentPlayer;
             
             let piece;
             if (currentPlayer === 1) {
@@ -229,32 +291,23 @@
             }
             piece.position.copy(position);
             scene.add(piece);
+            addPieceReference(idx, piece);
 
-            if (isLastChanceMode) {
-                if (checkWin()) {
-                    showFinalMessage(`REVERSAL! PLAYER ${currentPlayer} WIN!`, "#ffff00");
-                } else {
-                    showFinalMessage(`PLAYER ${firstWinner} WIN!`, firstWinner === 1 ? "#ff6666" : "#6666ff");
-                }
-                gameOver = true;
+            if (pieceLimitMode) {
+                handlePieceLimitForPlayer(currentPlayer, idx, piece);
+            }
+
+            if (handleWinAfterPlacement()) {
                 return;
             }
 
-            if (checkWin()) {
-                firstWinner = currentPlayer;
-                isLastChanceMode = true;
-                const m = document.getElementById('message');
-                m.innerText = `PLAYER ${firstWinner} WIN?`;
-                m.style.display = 'block';
-                m.style.color = firstWinner === 1 ? "#ff6666" : "#6666ff";
-                
-                currentPlayer = (currentPlayer === 1 ? 2 : 1);
-                updateUI();
+            if (maybeTriggerCpuCircleRelocation(placedPlayer) && handleWinAfterPlacement()) {
                 return;
             }
 
             currentPlayer = (currentPlayer === 1 ? 2 : 1);
             updateUI();
+            scheduleCpuMove();
         }
 
         function showFinalMessage(text, color) {
@@ -266,14 +319,278 @@
             document.getElementById('p2-badge').classList.remove('active');
         }
 
+        function blockCenterCell() {
+            if (!centerIndicator || pieceLimitMode) return;
+            if (boardState[CENTER_INDEX] === null) {
+                boardState[CENTER_INDEX] = BLOCKED_VALUE;
+            }
+            centerIndicator.visible = true;
+        }
+
+        function unblockCenterCell() {
+            if (!centerIndicator) return;
+            if (boardState[CENTER_INDEX] === BLOCKED_VALUE) {
+                boardState[CENTER_INDEX] = null;
+            }
+            centerIndicator.visible = false;
+        }
+
+        function updateCenterBlocking() {
+            if (cpuMode && !pieceLimitMode) {
+                blockCenterCell();
+            } else {
+                unblockCenterCell();
+            }
+        }
+
+        function showHint(text) {
+            const hint = document.getElementById('hint-message');
+            if (!hint) return;
+            hint.innerText = text;
+            hint.style.opacity = '1';
+            clearTimeout(hintTimeoutId);
+            hintTimeoutId = setTimeout(() => {
+                hint.style.opacity = '0';
+            }, 1400);
+        }
+
         function updateUI() {
             document.getElementById('p1-badge').className = 'player-badge' + (currentPlayer === 1 ? ' active' : '');
             document.getElementById('p2-badge').className = 'player-badge' + (currentPlayer === 2 ? ' active' : '');
         }
 
-        function checkWin() {
+        function checkWin(state = boardState) {
+            return Boolean(findWinningPlayer(state));
+        }
+
+        function handleWinAfterPlacement() {
+            if (isLastChanceMode) {
+                if (checkWin()) {
+                    showFinalMessage(`REVERSAL! PLAYER ${currentPlayer} WIN!`, "#ffff00");
+                } else {
+                    showFinalMessage(`PLAYER ${firstWinner} WIN!`, firstWinner === 1 ? "#ff6666" : "#6666ff");
+                }
+                gameOver = true;
+                return true;
+            }
+
+            if (checkWin()) {
+                const allowLastChance = !cpuMode;
+                if (allowLastChance && Math.random() < 0.2) {
+                    firstWinner = currentPlayer;
+                    isLastChanceMode = true;
+                    const m = document.getElementById('message');
+                    m.innerText = `PLAYER ${firstWinner} WIN?`;
+                    m.style.display = 'block';
+                    m.style.color = firstWinner === 1 ? "#ff6666" : "#6666ff";
+                    
+                    currentPlayer = (currentPlayer === 1 ? 2 : 1);
+                    updateUI();
+                    return true;
+                }
+                showFinalMessage(`PLAYER ${currentPlayer} WIN!`, currentPlayer === 1 ? "#ff6666" : "#6666ff");
+                gameOver = true;
+                return true;
+            }
+
+            return false;
+        }
+
+        function maybeTriggerCpuCircleRelocation(movedPlayer) {
+            if (movedPlayer !== cpuPlayer || !cpuMode || !pieceLimitMode || cpuRelocationUsed) {
+                return false;
+            }
+            if (!playerHasThreat(1)) return false;
+            const queue = playerPlacementQueues[1];
+            if (queue.length === 0) return false;
+            const emptyCells = getAvailableMoves(boardState);
+            if (emptyCells.length === 0) return false;
+            const sourceEntry = queue.find(entry => isPartOfThreat(entry.index, 1));
+            if (!sourceEntry) return false;
+            const targetIdx = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+            const success = movePlayerPiece(1, sourceEntry.index, targetIdx);
+            if (!success) return false;
+            cpuRelocationUsed = true;
+            showHint('CPUが円を1つ移動しました。');
+            return true;
+        }
+
+        function movePlayerPiece(player, sourceIdx, targetIdx) {
+            const piece = pieceObjects[sourceIdx];
+            if (!piece) return false;
+            boardState[sourceIdx] = null;
+            boardState[targetIdx] = player;
+            pieceObjects[sourceIdx] = null;
+            pieceObjects[targetIdx] = piece;
+            piece.position.copy(cells[targetIdx].position);
+            updateQueueIndexForPlayer(player, sourceIdx, targetIdx);
+            updateBlinkingStateForPlayer(player);
+            return true;
+        }
+
+
+        function toggleCpuMode() {
+            cpuMode = !cpuMode;
+            const btn = document.getElementById('cpu-toggle');
+            if (btn) {
+                btn.innerText = cpuMode ? 'CPUモード: ON' : 'CPUモード: OFF';
+            }
+            updateCenterBlocking();
+            if (cpuMode) {
+                cpuRelocationUsed = false;
+            }
+            if (cpuMode && currentPlayer === cpuPlayer && !gameOver) {
+                scheduleCpuMove();
+            }
+        }
+
+        function scheduleCpuMove() {
+            if (!cpuMode || gameOver || currentPlayer !== cpuPlayer) return;
+            if (cpuTimeoutId) {
+                clearTimeout(cpuTimeoutId);
+            }
+            const delay = CPU_THINK_MIN_DELAY + Math.random() * (CPU_THINK_MAX_DELAY - CPU_THINK_MIN_DELAY);
+            cpuTimeoutId = setTimeout(() => {
+                cpuTimeoutId = null;
+                doCpuMove();
+            }, delay);
+        }
+
+        function doCpuMove() {
+            if (gameOver || currentPlayer !== cpuPlayer) return;
+            const bestMove = findBestCpuMove();
+            if (bestMove === null) return;
+            const target = cells[bestMove];
+            if (!target) return;
+            placePiece(bestMove, target.position);
+        }
+
+        function findBestCpuMove() {
+            const emptyCells = getAvailableMoves(boardState);
+            if (emptyCells.length === 0) return null;
+            let candidateCells = emptyCells.filter(idx => idx !== CENTER_INDEX);
+            if (candidateCells.length === 0) candidateCells = emptyCells;
+            for (const idx of candidateCells) {
+                boardState[idx] = cpuPlayer;
+                if (findWinningPlayer(boardState) === cpuPlayer) {
+                    boardState[idx] = null;
+                    return idx;
+                }
+                boardState[idx] = null;
+            }
+            for (const idx of candidateCells) {
+                boardState[idx] = humanPlayer;
+                if (findWinningPlayer(boardState) === humanPlayer) {
+                    boardState[idx] = null;
+                    return idx;
+                }
+                boardState[idx] = null;
+            }
+            const lookahead = Math.min(MAX_CPU_LOOKAHEAD, candidateCells.length);
+            let bestScore = -Infinity;
+            let bestMoves = [];
+            for (const idx of candidateCells) {
+                boardState[idx] = cpuPlayer;
+                const score = minimax(boardState, lookahead - 1, -Infinity, Infinity, false);
+                boardState[idx] = null;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMoves = [idx];
+                } else if (score === bestScore) {
+                    bestMoves.push(idx);
+                }
+            }
+            if (bestMoves.length === 0) return candidateCells[0] || emptyCells[0];
+            const prioritized = bestMoves.filter(idx => PRIORITY_CELLS.includes(idx));
+            if (prioritized.length) return prioritized[0];
+            return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+        }
+
+        function getAvailableMoves(state) {
+            const moves = [];
+            for (let i = 0; i < state.length; i++) {
+                if (state[i] === null) moves.push(i);
+            }
+            return moves;
+        }
+
+        function minimax(state, depth, alpha, beta, maximizingPlayer) {
+            const winner = findWinningPlayer(state);
+            if (winner) return winner === cpuPlayer ? 1000 : -1000;
+            if (depth === 0 || isBoardFull(state)) return evaluateBoard(state);
+            const moves = getAvailableMoves(state);
+            if (maximizingPlayer) {
+                let maxEval = -Infinity;
+                for (const idx of moves) {
+                    state[idx] = cpuPlayer;
+                    const score = minimax(state, depth - 1, alpha, beta, false);
+                    state[idx] = null;
+                    maxEval = Math.max(maxEval, score);
+                    alpha = Math.max(alpha, score);
+                    if (beta <= alpha) break;
+                }
+                return maxEval;
+            }
+            let minEval = Infinity;
+            for (const idx of moves) {
+                state[idx] = humanPlayer;
+                const score = minimax(state, depth - 1, alpha, beta, true);
+                state[idx] = null;
+                minEval = Math.min(minEval, score);
+                beta = Math.min(beta, score);
+                if (beta <= alpha) break;
+            }
+            return minEval;
+        }
+
+        function evaluateBoard(state) {
+            let score = 0;
+            for (const line of winningLines) {
+                score += evaluateLine(line, state);
+            }
+            if (state[13] === cpuPlayer) score += CPU_CENTER_WEIGHT;
+            else if (state[13] === humanPlayer) score -= CPU_CENTER_WEIGHT;
+            for (const idx of CORNER_INDICES) {
+                if (state[idx] === cpuPlayer) score += CPU_CORNER_WEIGHT;
+                else if (state[idx] === humanPlayer) score -= CPU_CORNER_WEIGHT;
+            }
+            return score;
+        }
+
+        function evaluateLine(line, state) {
+            let cpuCount = 0;
+            let humanCount = 0;
+            for (const idx of line) {
+                if (state[idx] === cpuPlayer) cpuCount++;
+                else if (state[idx] === humanPlayer) humanCount++;
+            }
+            if (cpuCount > 0 && humanCount > 0) return 0;
+            if (cpuCount === 3) return 100;
+            if (humanCount === 3) return -120;
+            if (cpuCount === 2) return 30;
+            if (humanCount === 2) return -25;
+            if (cpuCount === 1) return 7;
+            if (humanCount === 1) return -4;
+            return 2;
+        }
+
+        function isBoardFull(state) {
+            return state.every(cell => cell !== null);
+        }
+
+        function findWinningPlayer(state = boardState) {
+            for (const line of winningLines) {
+                const first = state[line[0]];
+                if (first && first === state[line[1]] && first === state[line[2]]) {
+                    return first;
+                }
+            }
+            return null;
+        }
+
+        function generateWinningLines() {
             const lines = [];
-            const getIdx = (x, y, z) => x + z * 3 + y * 9; 
+            const getIdx = (x, y, z) => x + z * 3 + y * 9;
             for (let i = 0; i < 3; i++) {
                 for (let j = 0; j < 3; j++) {
                     lines.push([getIdx(i, j, 0), getIdx(i, j, 1), getIdx(i, j, 2)]);
@@ -288,8 +605,260 @@
             }
             lines.push([getIdx(0,0,0), getIdx(1,1,1), getIdx(2,2,2)], [getIdx(2,0,0), getIdx(1,1,1), getIdx(0,2,2)]);
             lines.push([getIdx(0,2,0), getIdx(1,1,1), getIdx(2,0,2)], [getIdx(0,0,2), getIdx(1,1,1), getIdx(2,2,0)]);
-            
-            return lines.some(line => boardState[line[0]] && boardState[line[0]] === boardState[line[1]] && boardState[line[0]] === boardState[line[2]]);
+            return lines;
+        }
+
+        function addCenterBlockIndicator(position) {
+            const indicator = new THREE.Group();
+            const mat = new THREE.MeshPhongMaterial({ color: 0xffdd66, emissive: 0x553300, shininess: 120, transparent: true, opacity: 0.8 });
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.04, 8, 60), mat);
+            ring.rotation.x = Math.PI / 2;
+            const bar1 = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.05, 0.05), mat);
+            const bar2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.95), mat);
+            indicator.add(ring, bar1, bar2);
+            indicator.position.copy(position);
+            indicator.position.y += 0.04;
+            indicator.visible = false;
+            scene.add(indicator);
+            const glow = new THREE.PointLight(0xffdd66, 0.65, 3);
+            glow.position.copy(position);
+            glow.position.y += 0.65;
+            scene.add(glow);
+            return indicator;
+        }
+
+        function addPieceReference(idx, piece) {
+            pieceObjects[idx] = piece;
+        }
+
+        function removePieceReference(idx) {
+            const existing = pieceObjects[idx];
+            if (!existing) return;
+            scene.remove(existing);
+            pieceObjects[idx] = null;
+            maybeStopBlinkingForPiece(idx);
+        }
+
+        function handlePieceLimitForPlayer(player, idx, piece) {
+            const queue = playerPlacementQueues[player];
+            queue.push({ index: idx, piece });
+            if (queue.length > PIECE_LIMIT) {
+                const removed = queue.shift();
+                if (removed) {
+                    boardState[removed.index] = null;
+                    removePieceReference(removed.index);
+                }
+            }
+            updateBlinkingStateForPlayer(player);
+        }
+
+        function togglePieceLimitMode() {
+            pieceLimitMode = !pieceLimitMode;
+            const btn = document.getElementById('piece-limit-toggle');
+            if (btn) {
+                btn.innerText = pieceLimitMode ? '4個制限モード: ON' : '4個制限モード: OFF';
+            }
+            if (!pieceLimitMode) {
+                playerPlacementQueues[1].length = 0;
+                playerPlacementQueues[2].length = 0;
+                stopBlinkingForPlayer(1);
+                stopBlinkingForPlayer(2);
+            } else {
+                cpuRelocationUsed = false;
+                updateBlinkingStateForPlayer(1);
+                updateBlinkingStateForPlayer(2);
+            }
+            updateCenterBlocking();
+        }
+
+        function updateBlinkingStateForPlayer(player) {
+            if (!pieceLimitMode) {
+                stopBlinkingForPlayer(player);
+                return;
+            }
+            const queue = playerPlacementQueues[player];
+            if (queue.length >= PIECE_LIMIT) {
+                startBlinkingForPlayer(player, queue[0]);
+            } else {
+                stopBlinkingForPlayer(player);
+            }
+        }
+
+        function startBlinkingForPlayer(player, entry) {
+            if (!entry || !entry.piece) return;
+            stopBlinkingForPlayer(player);
+            const materials = collectBlinkMaterials(entry.piece);
+            if (materials.length === 0) return;
+            entry._blinkSnapshot = materials.map(mat => ({
+                mat,
+                emissive: mat.emissive.clone(),
+                intensity: mat.emissiveIntensity ?? 0
+            }));
+            entry._blinkOn = false;
+            materials.forEach(mat => {
+                mat.emissive.set(0xff9999);
+                mat.emissiveIntensity = 0.15;
+            });
+            blinkTargets[player] = entry;
+            blinkIntervals[player] = setInterval(() => {
+                if (!blinkTargets[player] || !blinkTargets[player].piece) {
+                    stopBlinkingForPlayer(player);
+                    return;
+                }
+                entry._blinkOn = !entry._blinkOn;
+                const intensity = entry._blinkOn ? 1.4 : 0.15;
+                materials.forEach(mat => {
+                    mat.emissiveIntensity = intensity;
+                });
+            }, 360);
+        }
+
+        function stopBlinkingForPlayer(player) {
+            if (blinkIntervals[player]) {
+                clearInterval(blinkIntervals[player]);
+                blinkIntervals[player] = null;
+            }
+            const target = blinkTargets[player];
+            if (target && target._blinkSnapshot) {
+                target._blinkSnapshot.forEach(({ mat, emissive, intensity }) => {
+                    mat.emissive.copy(emissive);
+                    mat.emissiveIntensity = intensity;
+                });
+                delete target._blinkSnapshot;
+            }
+            blinkTargets[player] = null;
+        }
+
+        function maybeStopBlinkingForPiece(idx) {
+            for (const player of [1, 2]) {
+                const target = blinkTargets[player];
+                if (target && target.index === idx) {
+                    stopBlinkingForPlayer(player);
+                }
+            }
+        }
+
+        function collectBlinkMaterials(piece) {
+            const materials = new Set();
+            piece.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    const matList = Array.isArray(child.material) ? child.material : [child.material];
+                    matList.forEach(mat => materials.add(mat));
+                }
+            });
+            return Array.from(materials);
+        }
+
+        function playerHasThreat(player) {
+            for (const line of winningLines) {
+                const count = line.reduce((acc, idx) => acc + (boardState[idx] === player ? 1 : 0), 0);
+                if (count >= 2) return true;
+            }
+            return false;
+        }
+
+        function isPartOfThreat(idx, player) {
+            for (const line of winningLines) {
+                if (!line.includes(idx)) continue;
+                const count = line.reduce((acc, cellIdx) => acc + (boardState[cellIdx] === player ? 1 : 0), 0);
+                if (count >= 2) return true;
+            }
+            return false;
+        }
+
+        function startRelocationMode() {
+            if (relocationUsed) {
+                showHint('後攻リロケートは既に使用済みです。');
+                return;
+            }
+            if (currentPlayer !== 2) {
+                showHint('後攻のターンでのみ使用できます。');
+                return;
+            }
+            if (relocationActive) {
+                showHint('移動させる駒とマスを選択してください。');
+                return;
+            }
+            if (!playerHasThreat(1)) {
+                showHint('先行に連携ができていないため使用できません。');
+                return;
+            }
+            relocationActive = true;
+            relocationSourceIdx = null;
+            const btn = document.getElementById('relocation-toggle');
+            if (btn) {
+                btn.innerText = '後攻リロケート: 選択中';
+            }
+            showHint('先行の駒を1つ選んでください。');
+        }
+
+        function handleRelocationClick(idx) {
+            if (!relocationActive) return;
+            if (relocationSourceIdx === null) {
+                if (boardState[idx] === 1) {
+                    if (!isPartOfThreat(idx, 1)) {
+                        showHint('連携中の先行の駒を選んでください。');
+                        return;
+                    }
+                    relocationSourceIdx = idx;
+                    showHint('空いているマスを選んでください。');
+                } else {
+                    showHint('先行が置いたマスを選んでください。');
+                }
+                return;
+            }
+            if (boardState[idx] !== null) {
+                showHint('空きマスを選択してください。');
+                return;
+            }
+            finalizeRelocation(idx);
+        }
+
+        function finalizeRelocation(targetIdx) {
+            if (relocationSourceIdx === null) return;
+            const success = relocatePieceForRelocation(relocationSourceIdx, targetIdx);
+            relocationSourceIdx = null;
+            relocationActive = false;
+            relocationUsed = true;
+            disableRelocationButton();
+            if (!success) {
+                showHint('移動に失敗しました。');
+                return;
+            }
+            const winner = findWinningPlayer();
+            if (winner) {
+                showFinalMessage(`PLAYER ${winner} WIN!`, winner === 1 ? "#ff6666" : "#6666ff");
+                gameOver = true;
+                return;
+            }
+            currentPlayer = 1;
+            updateUI();
+            if (cpuMode && currentPlayer === cpuPlayer && !gameOver) {
+                scheduleCpuMove();
+            }
+            showHint('後攻のリロケートが完了しました。');
+        }
+
+        function relocatePieceForRelocation(sourceIdx, targetIdx) {
+            return movePlayerPiece(1, sourceIdx, targetIdx);
+        }
+
+        function updateQueueIndexForPlayer(player, fromIdx, toIdx) {
+            const queue = playerPlacementQueues[player];
+            for (const entry of queue) {
+                if (entry.index === fromIdx) {
+                    entry.index = toIdx;
+                    break;
+                }
+            }
+        }
+
+        function disableRelocationButton() {
+            const btn = document.getElementById('relocation-toggle');
+            if (btn) {
+                btn.innerText = '後攻リロケート: 使用済み';
+                btn.disabled = true;
+            }
         }
 
         function onWindowResize() {
@@ -303,7 +872,7 @@
 
             // 3D化のトリガー判定: カメラが中心軸(X, Z = 0)から外れたらドラッグされたとみなす
             if (!is3DMode) {
-                if (Math.abs(camera.position.x) > 0.01 || Math.abs(camera.position.z) > 0.01) {
+                if (Math.abs(camera.position.x) > 5.0 || Math.abs(camera.position.z) > 5.0) {
                     is3DMode = true;
                 }
             }
@@ -323,6 +892,9 @@
             renderer.render(scene, camera);
         }
 
+        window.toggleCpuMode = toggleCpuMode;
+        window.togglePieceLimitMode = togglePieceLimitMode;
+        window.startRelocationMode = startRelocationMode;
         window.resetGame = () => location.reload();
     </script>
 </body>
