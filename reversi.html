@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Spatial Reversi - Local & Online</title>
+    <style>
+        :root {
+            --ui-bg: rgba(255, 255, 255, 0.95);
+            --text-main: #333;
+            --accent: #d4af37;
+            --accent-glow: rgba(212, 175, 55, 0.5);
+            --danger: #e53e3e;
+        }
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+            font-family: "Hiragino Mincho ProN", serif; 
+        }
+        
+        #header-ui {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 100;
+        }
+
+        .score-panel {
+            display: flex; gap: 40px; background: var(--ui-bg);
+            padding: 12px 40px; border-radius: 50px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            pointer-events: auto; align-items: center;
+        }
+
+        .player-info { display: flex; align-items: center; gap: 12px; font-size: 1.1em; font-weight: bold; color: var(--text-main); transition: all 0.3s; padding: 5px 15px; border-radius: 20px; }
+        .stone-icon { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #999; }
+        .stone-icon.black { background: #111; }
+        .stone-icon.white { background: #fff; }
+        .active-turn { background: #eee; box-shadow: 0 0 15px var(--accent-glow); border: 2px solid var(--accent); }
+        .score-display { font-family: "Georgia", serif; font-size: 1.4em; min-width: 40px; text-align: center; }
+
+        /* Timer UI */
+        #timer-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        #timer-container {
+            width: 80%; height: 6px; background: rgba(255,255,255,0.2); border-radius: 3px; overflow: hidden;
+        }
+        #timer-bar {
+            width: 100%; height: 100%; background: var(--accent); transition: width 1s linear;
+        }
+        #timer-text { font-weight: bold; color: white; font-size: 1.5em; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+
+        /* Action Buttons Area */
+        .action-btns {
+            display: flex; gap: 10px; margin-top: 5px;
+        }
+
+        #room-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 1000; color: white;
+        }
+        .room-card {
+            background: var(--ui-bg); color: var(--text-main);
+            padding: 40px; border-radius: 24px; text-align: center;
+            width: 380px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        
+        .room-input {
+            font-size: 1.8em; letter-spacing: 0.2em; text-align: center;
+            padding: 10px; border: 2px solid #ddd; border-radius: 12px;
+            width: 80%; margin: 10px auto; font-family: monospace;
+        }
+
+        #status-bar {
+            position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.7); color: white; padding: 10px 30px;
+            border-radius: 30px; font-size: 1em; z-index: 90; pointer-events: none;
+            backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .btn-ui {
+            background: var(--ui-bg); border: 1px solid #ccc; padding: 12px 20px;
+            border-radius: 30px; cursor: pointer; font-size: 0.9em; font-weight: bold;
+            color: var(--text-main); transition: all 0.2s; width: auto;
+        }
+        .btn-ui:hover { background: #fff; border-color: var(--accent); transform: translateY(-2px); }
+        .btn-ui.primary { background: var(--accent); color: white; border: none; width: 100%; margin-top: 10px; font-size: 1em; }
+        .btn-ui.secondary { background: #4a5568; color: white; border: none; width: 100%; margin-top: 10px; font-size: 1em; }
+        .btn-ui.danger { color: #e53e3e; border-color: #feb2b2; }
+        .btn-ui.nav { color: #4a5568; border-color: #cbd5e0; }
+
+        #win-screen {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            display: none; background: var(--ui-bg); padding: 50px; border-radius: 30px;
+            text-align: center; box-shadow: 0 0 100px rgba(0,0,0,0.9); z-index: 200; border: 3px solid var(--accent);
+        }
+
+        .mode-note {
+            margin: 12px auto 0;
+            font-size: 0.85em;
+            color: #4a5568;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+<div id="room-overlay">
+    <div class="room-card" id="initial-card">
+        <h1 style="margin-top:0; font-size: 1.8em; letter-spacing: 0.1em;">3D SPATIAL REVERSI</h1>
+        <p class="mode-note">このモードは3Dオセロです。イカサマはありません。</p>
+        
+        <div style="margin-bottom: 25px;">
+            <button id="btn-local" class="btn-ui secondary">一人で遊ぶ (ローカル対局)</button>
+            <p style="font-size: 0.75em; color: #718096; margin-top: 6px;">1台の端末で交互に操作します</p>
+        </div>
+
+        <div style="margin: 20px 0; border-top: 1px solid #eee; position: relative;">
+            <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--ui-bg); padding: 0 15px; font-size: 0.8em; color: #a0aec0;">オンライン対局</span>
+        </div>
+
+        <button id="btn-create" class="btn-ui primary" disabled>対局室を新規作成</button>
+
+        <div style="margin-top: 20px;">
+            <input type="text" id="room-id-input" class="room-input" maxlength="4" placeholder="部屋番号">
+            <button id="btn-join" class="btn-ui primary" disabled style="margin-top: 0;">部屋に参加する</button>
+        </div>
+        
+        <p id="room-status" style="font-size: 0.8em; color: #a0aec0; margin-top: 20px;">サーバーに接続中...</p>
+    </div>
+
+    <div class="room-card" id="waiting-card" style="display:none">
+        <h2>待機中...</h2>
+        <p>対戦相手に以下の番号を伝えてください</p>
+        <div id="room-id-display" style="font-size: 3.5em; font-weight: bold; color: var(--accent); letter-spacing: 0.2em; margin: 20px 0; background: #f7fafc; border-radius: 15px;">----</div>
+        <button class="btn-ui nav" onclick="resetToTitle()" style="width: 100%;">中止して戻る</button>
+    </div>
+</div>
+
+<div id="header-ui" style="display: none;">
+    <div id="timer-wrapper">
+        <div id="timer-text">30</div>
+        <div id="timer-container"><div id="timer-bar"></div></div>
+    </div>
+    <div class="score-panel">
+        <div id="player-black" class="player-info">
+            <div class="stone-icon black"></div>
+            <span>BLACK</span>
+            <span id="score-b" class="score-display">4</span>
+        </div>
+        <div id="player-white" class="player-info">
+            <span id="score-w" class="score-display">4</span>
+            <span>WHITE</span>
+            <div class="stone-icon white"></div>
+        </div>
+    </div>
+    <div class="action-btns">
+        <button id="btn-surrender" class="btn-ui danger">投了する</button>
+        <button id="btn-back-to-title" class="btn-ui nav" onclick="resetToTitle()">タイトルへ</button>
+    </div>
+</div>
+
+<div id="status-bar" style="display: none;">対局開始</div>
+
+<div id="win-screen">
+    <h1 id="win-text" style="font-size: 2.5em; margin: 0;">BLACK WINS</h1>
+    <p id="win-reason" style="color: #666; margin: 15px 0 30px;">対局終了</p>
+    <button class="btn-ui primary" onclick="resetToTitle()">タイトルへ戻る</button>
+</div>
+
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+            "firebase/app": "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js",
+            "firebase/auth": "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js",
+            "firebase/firestore": "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { initializeApp } from 'firebase/app';
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+    import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+
+    // --- Firebase Setup ---
+    const firebaseConfig = JSON.parse(__firebase_config);
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'reversi-3d-v2';
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let user = null;
+    let roomRef = null;
+    let myColor = null; 
+    let isLocalMode = false;
+    let gameActive = false;
+
+    // --- Timer Logic ---
+    const TIME_LIMIT = 30;
+    let timeLeft = TIME_LIMIT;
+    let timerInterval = null;
+
+    // --- Game Logic Constants ---
+    const SIZE = 6;
+    const OFFSET = (SIZE - 1) / 2;
+    let board = Array(SIZE).fill().map(() => Array(SIZE).fill().map(() => Array(SIZE).fill(0)));
+    let pieceMeshes = Array(SIZE).fill().map(() => Array(SIZE).fill().map(() => Array(SIZE).fill(null)));
+    let cubes = [];
+    let currentPlayer = 1;
+    let unsubscribeRoom = null;
+
+    // --- Three.js Setup ---
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    let controls, ghostPiece;
+
+    const mats = {
+        black: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1, metalness: 0.5 }),
+        white: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1, metalness: 0.2 }),
+        gridNormal: new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.05 }),
+        hintDot: new THREE.MeshBasicMaterial({ color: 0xd4af37, transparent: true, opacity: 0.8 }),
+        ghost: new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.4 })
+    };
+
+    function initThree() {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        camera.position.set(12, 10, 15);
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+        sun.position.set(10, 20, 15);
+        scene.add(sun);
+
+        for (let x = 0; x < SIZE; x++) {
+            for (let y = 0; y < SIZE; y++) {
+                for (let z = 0; z < SIZE; z++) {
+                    const hitBox = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.9, 0.9, 0.9),
+                        new THREE.MeshBasicMaterial({ visible: false })
+                    );
+                    hitBox.position.set(x - OFFSET, y - OFFSET, z - OFFSET);
+                    hitBox.userData = { x, y, z };
+                    scene.add(hitBox);
+                    cubes.push(hitBox);
+
+                    const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.98, 0.98, 0.98));
+                    const line = new THREE.LineSegments(edgeGeo, mats.gridNormal.clone());
+                    line.position.copy(hitBox.position);
+                    scene.add(line);
+
+                    const isCorner = (v) => v === 0 || v === SIZE - 1;
+                    if (isCorner(x) && isCorner(y) && isCorner(z)) {
+                        const cornerFrame = new THREE.Mesh(
+                            new THREE.BoxGeometry(1.05, 1.05, 1.05),
+                            new THREE.MeshBasicMaterial({ color: 0xd4af37, wireframe: true, transparent: true, opacity: 0.4 })
+                        );
+                        cornerFrame.position.copy(hitBox.position);
+                        scene.add(cornerFrame);
+                    }
+
+                    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), mats.hintDot.clone());
+                    dot.position.copy(hitBox.position);
+                    dot.visible = false;
+                    scene.add(dot);
+                    hitBox.userData.hintDot = dot;
+                }
+            }
+        }
+
+        ghostPiece = new THREE.Mesh(new THREE.SphereGeometry(0.45, 32, 32), mats.ghost);
+        ghostPiece.visible = false;
+        scene.add(ghostPiece);
+
+        let startX, startY;
+        window.addEventListener('mousedown', (e) => { startX = e.clientX; startY = e.clientY; });
+        window.addEventListener('mouseup', (e) => {
+            if (Math.hypot(e.clientX - startX, e.clientY - startY) < 5) onPointerClick(e);
+        });
+        window.addEventListener('mousemove', onPointerMove);
+        animate();
+    }
+
+    // --- Timer Logic ---
+    function startTimer() {
+        clearInterval(timerInterval);
+        timeLeft = TIME_LIMIT;
+        updateTimerUI();
+        
+        timerInterval = setInterval(() => {
+            if (!gameActive) { clearInterval(timerInterval); return; }
+
+            if (isLocalMode || currentPlayer === myColor) {
+                timeLeft--;
+                updateTimerUI();
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    autoMove();
+                }
+            }
+        }, 1000);
+    }
+
+    function updateTimerUI() {
+        const bar = document.getElementById('timer-bar');
+        const text = document.getElementById('timer-text');
+        if (!bar || !text) return;
+
+        const percent = (timeLeft / TIME_LIMIT) * 100;
+        bar.style.width = `${percent}%`;
+        bar.style.backgroundColor = timeLeft <= 5 ? 'var(--danger)' : 'var(--accent)';
+        text.innerText = Math.max(0, timeLeft);
+    }
+
+    function autoMove() {
+        if (!gameActive) return;
+        const validMoves = [];
+        cubes.forEach(c => {
+            const flips = getFlips(c.userData.x, c.userData.y, c.userData.z, currentPlayer);
+            if (flips.length > 0) validMoves.push({ x: c.userData.x, y: c.userData.y, z: c.userData.z, flips });
+        });
+
+        if (validMoves.length > 0) {
+            const move = validMoves[Math.floor(Math.random() * validMoves.length)];
+            executeMove(move.x, move.y, move.z, move.flips);
+        }
+    }
+
+    // --- Game Logic ---
+    function getFlips(x, y, z, p) {
+        if (board[x][y][z] !== 0) return [];
+        const opp = 3 - p;
+        let flips = [];
+        for(let dx=-1; dx<=1; dx++) {
+            for(let dy=-1; dy<=1; dy++) {
+                for(let dz=-1; dz<=1; dz++) {
+                    if(dx===0 && dy===0 && dz===0) continue;
+                    let tmp=[], nx=x+dx, ny=y+dy, nz=z+dz;
+                    while(nx>=0 && nx<SIZE && ny>=0 && ny<SIZE && nz>=0 && nz<SIZE) {
+                        if(board[nx][ny][nz] === opp) tmp.push({x:nx, y:ny, z:nz});
+                        else if(board[nx][ny][nz] === p) { flips = flips.concat(tmp); break; }
+                        else break;
+                        nx+=dx; ny+=dy; nz+=dz;
+                    }
+                }
+            }
+        }
+        return flips;
+    }
+
+    function placePiece(x, y, z, p, flips) {
+        board[x][y][z] = p;
+        updatePieceMesh(x, y, z, p);
+        flips.forEach(f => {
+            board[f.x][f.y][f.z] = p;
+            updatePieceMesh(f.x, f.y, f.z, p);
+        });
+    }
+
+    function updatePieceMesh(x, y, z, p) {
+        if (pieceMeshes[x][y][z]) {
+            pieceMeshes[x][y][z].material = p === 1 ? mats.black : mats.white;
+            pieceMeshes[x][y][z].scale.set(1.2, 1.2, 1.2);
+        } else {
+            const m = new THREE.Mesh(new THREE.SphereGeometry(0.45, 32, 32), p === 1 ? mats.black : mats.white);
+            m.position.set(x - OFFSET, y - OFFSET, z - OFFSET);
+            scene.add(m);
+            pieceMeshes[x][y][z] = m;
+        }
+    }
+
+    function checkPass(p) {
+        return !cubes.some(c => getFlips(c.userData.x, c.userData.y, c.userData.z, p).length > 0);
+    }
+
+    async function executeMove(x, y, z, flips) {
+        placePiece(x, y, z, currentPlayer, flips);
+        
+        let nextPlayer = 3 - currentPlayer;
+        let status = 'playing';
+
+        if (checkPass(nextPlayer)) {
+            nextPlayer = 3 - nextPlayer;
+            if (checkPass(nextPlayer)) status = 'finished';
+        }
+
+        if (isLocalMode) {
+            currentPlayer = nextPlayer;
+            if (status === 'finished') endGame();
+            else {
+                updateUI();
+                startTimer();
+            }
+        } else {
+            await updateDoc(roomRef, {
+                board: board.flat(2),
+                turn: nextPlayer,
+                status: status,
+                updatedAt: Date.now()
+            });
+        }
+    }
+
+    // --- Input Handlers ---
+    function onPointerMove(e) {
+        if (!gameActive) return;
+        if (!isLocalMode && currentPlayer !== myColor) {
+            ghostPiece.visible = false;
+            return;
+        }
+
+        const hit = raycast(e.clientX, e.clientY);
+        if (hit && getFlips(hit.object.userData.x, hit.object.userData.y, hit.object.userData.z, currentPlayer).length > 0) {
+            ghostPiece.position.copy(hit.object.position);
+            ghostPiece.material.color.set(currentPlayer === 1 ? 0x000000 : 0xffffff);
+            ghostPiece.visible = true;
+            document.body.style.cursor = 'pointer';
+        } else {
+            ghostPiece.visible = false;
+            document.body.style.cursor = 'default';
+        }
+    }
+
+    function onPointerClick(e) {
+        if (!gameActive) return;
+        if (!isLocalMode && currentPlayer !== myColor) return;
+
+        const hit = raycast(e.clientX, e.clientY);
+        if (!hit) return;
+
+        const { x, y, z } = hit.object.userData;
+        const flips = getFlips(x, y, z, currentPlayer);
+
+        if (flips.length > 0) {
+            executeMove(x, y, z, flips);
+        }
+    }
+
+    function raycast(mx, my) {
+        const mouse = new THREE.Vector2((mx/window.innerWidth)*2-1, -(my/window.innerHeight)*2+1);
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(cubes);
+        for (let intersect of intersects) {
+            const {x,y,z} = intersect.object.userData;
+            if (getFlips(x, y, z, currentPlayer).length > 0) return intersect;
+        }
+        return intersects[0] || null;
+    }
+
+    // --- Reset Logic ---
+    window.resetToTitle = function() {
+        gameActive = false;
+        clearInterval(timerInterval);
+        if (unsubscribeRoom) unsubscribeRoom();
+        
+        // Visual Reset
+        for(let x=0; x<SIZE; x++) for(let y=0; y<SIZE; y++) for(let z=0; z<SIZE; z++) {
+            if (pieceMeshes[x][y][z]) {
+                scene.remove(pieceMeshes[x][y][z]);
+                pieceMeshes[x][y][z] = null;
+            }
+            board[x][y][z] = 0;
+        }
+
+        // UI Reset
+        document.getElementById('room-overlay').style.display = 'flex';
+        document.getElementById('initial-card').style.display = 'block';
+        document.getElementById('waiting-card').style.display = 'none';
+        document.getElementById('header-ui').style.display = 'none';
+        document.getElementById('status-bar').style.display = 'none';
+        document.getElementById('win-screen').style.display = 'none';
+        
+        isLocalMode = false;
+        myColor = null;
+        currentPlayer = 1;
+    }
+
+    // --- Mode Handlers ---
+    function startLocalGame() {
+        isLocalMode = true;
+        gameActive = true;
+        document.getElementById('room-overlay').style.display = 'none';
+        document.getElementById('header-ui').style.display = 'flex';
+        document.getElementById('status-bar').style.display = 'block';
+        
+        setupInitialBoard();
+        updateUI();
+        startTimer();
+    }
+
+    function setupInitialBoard() {
+        const mid = [[2,2,2,1],[3,3,2,1],[2,3,3,1],[3,2,3,1],[2,2,3,2],[3,3,3,2],[2,3,2,2],[3,2,2,2]];
+        mid.forEach(([x,y,z,p]) => placePiece(x, y, z, p, []));
+    }
+
+    async function handleCreateRoom() {
+        const roomNum = Math.floor(1000 + Math.random() * 9000).toString();
+        roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomNum);
+        
+        myColor = 1;
+        const flatBoard = Array(SIZE * SIZE * SIZE).fill(0);
+        const mid = [[2,2,2,1],[3,3,2,1],[2,3,3,1],[3,2,3,1],[2,2,3,2],[3,3,3,2],[2,3,2,2],[3,2,2,2]];
+        mid.forEach(([x,y,z,p]) => flatBoard[x * SIZE * SIZE + y * SIZE + z] = p);
+
+        await setDoc(roomRef, {
+            black: user.uid, white: null,
+            board: flatBoard, turn: 1, status: 'waiting',
+            roomNumber: roomNum, updatedAt: Date.now()
+        });
+
+        document.getElementById('initial-card').style.display = 'none';
+        document.getElementById('waiting-card').style.display = 'block';
+        document.getElementById('room-id-display').innerText = roomNum;
+        listenToRoom();
+    }
+
+    async function handleJoinRoom() {
+        const num = document.getElementById('room-id-input').value;
+        if (num.length !== 4) return;
+        roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', num);
+        const snap = await getDoc(roomRef);
+        if (!snap.exists()) { alert("部屋が見つかりません"); return; }
+        
+        myColor = 2;
+        await updateDoc(roomRef, { white: user.uid, status: 'playing' });
+        listenToRoom();
+    }
+
+    function listenToRoom() {
+        if (unsubscribeRoom) unsubscribeRoom();
+        unsubscribeRoom = onSnapshot(roomRef, (snap) => {
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const prevTurn = currentPlayer;
+            syncBoard(data.board);
+            currentPlayer = data.turn;
+
+            if (data.status === 'playing') {
+                document.getElementById('room-overlay').style.display = 'none';
+                document.getElementById('header-ui').style.display = 'flex';
+                document.getElementById('status-bar').style.display = 'block';
+                gameActive = true;
+                updateUI();
+                if (prevTurn !== currentPlayer) startTimer();
+            }
+            if (data.status === 'finished') endGame(data.surrenderBy);
+        });
+    }
+
+    function syncBoard(flat) {
+        for (let i = 0; i < flat.length; i++) {
+            const x = Math.floor(i / (SIZE * SIZE)), y = Math.floor((i / SIZE) % SIZE), z = i % SIZE;
+            if (board[x][y][z] !== flat[i]) {
+                board[x][y][z] = flat[i];
+                if (flat[i] !== 0) updatePieceMesh(x, y, z, flat[i]);
+            }
+        }
+    }
+
+    function updateUI() {
+        const b = board.flat(2).filter(v => v === 1).length;
+        const w = board.flat(2).filter(v => v === 2).length;
+        document.getElementById('score-b').innerText = b;
+        document.getElementById('score-w').innerText = w;
+        document.getElementById('player-black').classList.toggle('active-turn', currentPlayer === 1);
+        document.getElementById('player-white').classList.toggle('active-turn', currentPlayer === 2);
+        
+        const status = document.getElementById('status-bar');
+        if (isLocalMode) {
+            status.innerText = (currentPlayer === 1 ? "黒" : "白") + " の番です";
+        } else {
+            status.innerText = currentPlayer === myColor ? "あなたの番です" : "相手の通信を待っています...";
+        }
+
+        cubes.forEach(c => {
+            const can = getFlips(c.userData.x, c.userData.y, c.userData.z, currentPlayer).length > 0;
+            c.userData.hintDot.visible = can && (isLocalMode || currentPlayer === myColor);
+        });
+    }
+
+    function endGame(surrenderBy) {
+        gameActive = false;
+        clearInterval(timerInterval);
+        const b = board.flat(2).filter(v => v === 1).length;
+        const w = board.flat(2).filter(v => v === 2).length;
+        const winText = document.getElementById('win-text');
+        
+        if (surrenderBy) {
+            winText.innerText = surrenderBy === 1 ? "WHITE WINS" : "BLACK WINS";
+            document.getElementById('win-reason').innerText = (surrenderBy === 1 ? "黒" : "白") + " が投了しました";
+        } else {
+            winText.innerText = b === w ? "DRAW" : (b > w ? "BLACK WINS" : "WHITE WINS");
+            document.getElementById('win-reason').innerText = `最終スコア: 黒 ${b} - 白 ${w}`;
+        }
+        document.getElementById('win-screen').style.display = "block";
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        if (ghostPiece && ghostPiece.visible) ghostPiece.material.opacity = 0.3 + Math.sin(Date.now() * 0.008) * 0.15;
+        for(let x=0; x<SIZE; x++) for(let y=0; y<SIZE; y++) for(let z=0; z<SIZE; z++) {
+            if (pieceMeshes[x][y][z]) pieceMeshes[x][y][z].scale.lerp(new THREE.Vector3(1,1,1), 0.1);
+        }
+        renderer.render(scene, camera);
+    }
+
+    async function start() {
+        initThree();
+        document.getElementById('btn-local').onclick = startLocalGame;
+        
+        onAuthStateChanged(auth, (u) => {
+            if (u) {
+                user = u;
+                document.getElementById('btn-create').disabled = false;
+                document.getElementById('btn-join').disabled = false;
+                document.getElementById('room-status').innerText = "オンライン接続済み";
+            }
+        });
+
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+        else await signInAnonymously(auth);
+
+        document.getElementById('btn-create').onclick = handleCreateRoom;
+        document.getElementById('btn-join').onclick = handleJoinRoom;
+        document.getElementById('btn-surrender').onclick = () => {
+            if(confirm("投了しますか？")) {
+                if(isLocalMode) endGame(currentPlayer);
+                else updateDoc(roomRef, { status: 'finished', surrenderBy: myColor });
+            }
+        };
+    }
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    start();
+</script>
+</body>
+</html>
