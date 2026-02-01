@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Spatial Reversi - Local & Online</title>
+    <title>3D Spatial Reversi - Local</title>
     <style>
         :root {
             --ui-bg: rgba(255, 255, 255, 0.95);
@@ -64,12 +64,6 @@
             width: 380px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
         
-        .room-input {
-            font-size: 1.8em; letter-spacing: 0.2em; text-align: center;
-            padding: 10px; border: 2px solid #ddd; border-radius: 12px;
-            width: 80%; margin: 10px auto; font-family: monospace;
-        }
-
         #status-bar {
             position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
             background: rgba(0,0,0,0.7); color: white; padding: 10px 30px;
@@ -107,32 +101,8 @@
 <div id="room-overlay">
     <div class="room-card" id="initial-card">
         <h1 style="margin-top:0; font-size: 1.8em; letter-spacing: 0.1em;">3D SPATIAL REVERSI</h1>
-        <p class="mode-note">このモードは3Dオセロです。イカサマはありません。</p>
-        
-        <div style="margin-bottom: 25px;">
-            <button id="btn-local" class="btn-ui secondary">一人で遊ぶ (ローカル対局)</button>
-            <p style="font-size: 0.75em; color: #718096; margin-top: 6px;">1台の端末で交互に操作します</p>
-        </div>
-
-        <div style="margin: 20px 0; border-top: 1px solid #eee; position: relative;">
-            <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--ui-bg); padding: 0 15px; font-size: 0.8em; color: #a0aec0;">オンライン対局</span>
-        </div>
-
-        <button id="btn-create" class="btn-ui primary" disabled>対局室を新規作成</button>
-
-        <div style="margin-top: 20px;">
-            <input type="text" id="room-id-input" class="room-input" maxlength="4" placeholder="部屋番号">
-            <button id="btn-join" class="btn-ui primary" disabled style="margin-top: 0;">部屋に参加する</button>
-        </div>
-        
-        <p id="room-status" style="font-size: 0.8em; color: #a0aec0; margin-top: 20px;">サーバーに接続中...</p>
-    </div>
-
-    <div class="room-card" id="waiting-card" style="display:none">
-        <h2>待機中...</h2>
-        <p>対戦相手に以下の番号を伝えてください</p>
-        <div id="room-id-display" style="font-size: 3.5em; font-weight: bold; color: var(--accent); letter-spacing: 0.2em; margin: 20px 0; background: #f7fafc; border-radius: 15px;">----</div>
-        <button class="btn-ui nav" onclick="resetToTitle()" style="width: 100%;">中止して戻る</button>
+        <p class="mode-note">このモードは3Dオセロです。1台の端末で交互に操作します。</p>
+        <button id="btn-local" class="btn-ui secondary">ローカル対局を開始</button>
     </div>
 </div>
 
@@ -171,10 +141,7 @@
     {
         "imports": {
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-            "firebase/app": "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js",
-            "firebase/auth": "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js",
-            "firebase/firestore": "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
         }
     }
 </script>
@@ -182,21 +149,7 @@
 <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { initializeApp } from 'firebase/app';
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-    import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 
-    // --- Firebase Setup ---
-    const firebaseConfig = JSON.parse(__firebase_config);
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'reversi-3d-v2';
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    let user = null;
-    let roomRef = null;
-    let myColor = null; 
-    let isLocalMode = false;
     let gameActive = false;
 
     // --- Timer Logic ---
@@ -211,7 +164,6 @@
     let pieceMeshes = Array(SIZE).fill().map(() => Array(SIZE).fill().map(() => Array(SIZE).fill(null)));
     let cubes = [];
     let currentPlayer = 1;
-    let unsubscribeRoom = null;
 
     // --- Three.js Setup ---
     const scene = new THREE.Scene();
@@ -299,13 +251,11 @@
         timerInterval = setInterval(() => {
             if (!gameActive) { clearInterval(timerInterval); return; }
 
-            if (isLocalMode || currentPlayer === myColor) {
-                timeLeft--;
-                updateTimerUI();
-                if (timeLeft <= 0) {
-                    clearInterval(timerInterval);
-                    autoMove();
-                }
+            timeLeft--;
+            updateTimerUI();
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                autoMove();
             }
         }, 1000);
     }
@@ -382,7 +332,7 @@
         return !cubes.some(c => getFlips(c.userData.x, c.userData.y, c.userData.z, p).length > 0);
     }
 
-    async function executeMove(x, y, z, flips) {
+    function executeMove(x, y, z, flips) {
         placePiece(x, y, z, currentPlayer, flips);
         
         let nextPlayer = 3 - currentPlayer;
@@ -393,31 +343,17 @@
             if (checkPass(nextPlayer)) status = 'finished';
         }
 
-        if (isLocalMode) {
-            currentPlayer = nextPlayer;
-            if (status === 'finished') endGame();
-            else {
-                updateUI();
-                startTimer();
-            }
-        } else {
-            await updateDoc(roomRef, {
-                board: board.flat(2),
-                turn: nextPlayer,
-                status: status,
-                updatedAt: Date.now()
-            });
+        currentPlayer = nextPlayer;
+        if (status === 'finished') endGame();
+        else {
+            updateUI();
+            startTimer();
         }
     }
 
     // --- Input Handlers ---
     function onPointerMove(e) {
         if (!gameActive) return;
-        if (!isLocalMode && currentPlayer !== myColor) {
-            ghostPiece.visible = false;
-            return;
-        }
-
         const hit = raycast(e.clientX, e.clientY);
         if (hit && getFlips(hit.object.userData.x, hit.object.userData.y, hit.object.userData.z, currentPlayer).length > 0) {
             ghostPiece.position.copy(hit.object.position);
@@ -432,7 +368,6 @@
 
     function onPointerClick(e) {
         if (!gameActive) return;
-        if (!isLocalMode && currentPlayer !== myColor) return;
 
         const hit = raycast(e.clientX, e.clientY);
         if (!hit) return;
@@ -461,7 +396,6 @@
     window.resetToTitle = function() {
         gameActive = false;
         clearInterval(timerInterval);
-        if (unsubscribeRoom) unsubscribeRoom();
         
         // Visual Reset
         for(let x=0; x<SIZE; x++) for(let y=0; y<SIZE; y++) for(let z=0; z<SIZE; z++) {
@@ -475,19 +409,15 @@
         // UI Reset
         document.getElementById('room-overlay').style.display = 'flex';
         document.getElementById('initial-card').style.display = 'block';
-        document.getElementById('waiting-card').style.display = 'none';
         document.getElementById('header-ui').style.display = 'none';
         document.getElementById('status-bar').style.display = 'none';
         document.getElementById('win-screen').style.display = 'none';
         
-        isLocalMode = false;
-        myColor = null;
         currentPlayer = 1;
     }
 
     // --- Mode Handlers ---
     function startLocalGame() {
-        isLocalMode = true;
         gameActive = true;
         document.getElementById('room-overlay').style.display = 'none';
         document.getElementById('header-ui').style.display = 'flex';
@@ -503,70 +433,6 @@
         mid.forEach(([x,y,z,p]) => placePiece(x, y, z, p, []));
     }
 
-    async function handleCreateRoom() {
-        const roomNum = Math.floor(1000 + Math.random() * 9000).toString();
-        roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomNum);
-        
-        myColor = 1;
-        const flatBoard = Array(SIZE * SIZE * SIZE).fill(0);
-        const mid = [[2,2,2,1],[3,3,2,1],[2,3,3,1],[3,2,3,1],[2,2,3,2],[3,3,3,2],[2,3,2,2],[3,2,2,2]];
-        mid.forEach(([x,y,z,p]) => flatBoard[x * SIZE * SIZE + y * SIZE + z] = p);
-
-        await setDoc(roomRef, {
-            black: user.uid, white: null,
-            board: flatBoard, turn: 1, status: 'waiting',
-            roomNumber: roomNum, updatedAt: Date.now()
-        });
-
-        document.getElementById('initial-card').style.display = 'none';
-        document.getElementById('waiting-card').style.display = 'block';
-        document.getElementById('room-id-display').innerText = roomNum;
-        listenToRoom();
-    }
-
-    async function handleJoinRoom() {
-        const num = document.getElementById('room-id-input').value;
-        if (num.length !== 4) return;
-        roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', num);
-        const snap = await getDoc(roomRef);
-        if (!snap.exists()) { alert("部屋が見つかりません"); return; }
-        
-        myColor = 2;
-        await updateDoc(roomRef, { white: user.uid, status: 'playing' });
-        listenToRoom();
-    }
-
-    function listenToRoom() {
-        if (unsubscribeRoom) unsubscribeRoom();
-        unsubscribeRoom = onSnapshot(roomRef, (snap) => {
-            if (!snap.exists()) return;
-            const data = snap.data();
-            const prevTurn = currentPlayer;
-            syncBoard(data.board);
-            currentPlayer = data.turn;
-
-            if (data.status === 'playing') {
-                document.getElementById('room-overlay').style.display = 'none';
-                document.getElementById('header-ui').style.display = 'flex';
-                document.getElementById('status-bar').style.display = 'block';
-                gameActive = true;
-                updateUI();
-                if (prevTurn !== currentPlayer) startTimer();
-            }
-            if (data.status === 'finished') endGame(data.surrenderBy);
-        });
-    }
-
-    function syncBoard(flat) {
-        for (let i = 0; i < flat.length; i++) {
-            const x = Math.floor(i / (SIZE * SIZE)), y = Math.floor((i / SIZE) % SIZE), z = i % SIZE;
-            if (board[x][y][z] !== flat[i]) {
-                board[x][y][z] = flat[i];
-                if (flat[i] !== 0) updatePieceMesh(x, y, z, flat[i]);
-            }
-        }
-    }
-
     function updateUI() {
         const b = board.flat(2).filter(v => v === 1).length;
         const w = board.flat(2).filter(v => v === 2).length;
@@ -576,15 +442,11 @@
         document.getElementById('player-white').classList.toggle('active-turn', currentPlayer === 2);
         
         const status = document.getElementById('status-bar');
-        if (isLocalMode) {
-            status.innerText = (currentPlayer === 1 ? "黒" : "白") + " の番です";
-        } else {
-            status.innerText = currentPlayer === myColor ? "あなたの番です" : "相手の通信を待っています...";
-        }
+        status.innerText = (currentPlayer === 1 ? "黒" : "白") + " の番です";
 
         cubes.forEach(c => {
             const can = getFlips(c.userData.x, c.userData.y, c.userData.z, currentPlayer).length > 0;
-            c.userData.hintDot.visible = can && (isLocalMode || currentPlayer === myColor);
+            c.userData.hintDot.visible = can;
         });
     }
 
@@ -615,28 +477,12 @@
         renderer.render(scene, camera);
     }
 
-    async function start() {
+    function start() {
         initThree();
         document.getElementById('btn-local').onclick = startLocalGame;
-        
-        onAuthStateChanged(auth, (u) => {
-            if (u) {
-                user = u;
-                document.getElementById('btn-create').disabled = false;
-                document.getElementById('btn-join').disabled = false;
-                document.getElementById('room-status').innerText = "オンライン接続済み";
-            }
-        });
-
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
-        else await signInAnonymously(auth);
-
-        document.getElementById('btn-create').onclick = handleCreateRoom;
-        document.getElementById('btn-join').onclick = handleJoinRoom;
         document.getElementById('btn-surrender').onclick = () => {
             if(confirm("投了しますか？")) {
-                if(isLocalMode) endGame(currentPlayer);
-                else updateDoc(roomRef, { status: 'finished', surrenderBy: myColor });
+                endGame(currentPlayer);
             }
         };
     }
