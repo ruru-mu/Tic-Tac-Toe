@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Spatial Reversi - Local</title>
+    <title>3Dオセロ - ローカル対局</title>
+    <meta name="description" content="制限時間つきで遊べる3D空間オセロのローカル対局ページです。">
+    <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="site.webmanifest">
+    <link rel="stylesheet" href="assets/css/common.css">
     <style>
         :root {
             --ui-bg: rgba(255, 255, 255, 0.95);
@@ -97,6 +101,8 @@
     </style>
 </head>
 <body>
+<div class="loading-overlay"><div class="loader-box"><h2>3Dオセロを読み込み中...</h2><p>3Dライブラリの読み込みに失敗した場合は通信状況を確認してください。</p></div></div>
+<nav class="game-nav" aria-label="ゲーム操作"><a class="btn" href="index.html">ゲーム一覧へ戻る</a><div class="game-actions"><button class="utility-button" type="button" data-open-modal="rules-modal">遊び方</button><button class="utility-button" type="button" onclick="SiteKit.toggleMute(this)">音: ON</button></div></nav>
 
 <div id="room-overlay">
     <div class="room-card" id="initial-card">
@@ -137,6 +143,8 @@
     <button class="btn-ui primary" onclick="resetToTitle()">タイトルへ戻る</button>
 </div>
 
+<div id="rules-modal" class="modal-backdrop"><section class="modal-card"><button class="utility-button modal-close" data-close-modal="rules-modal">閉じる</button><h2>遊び方</h2><ul><li>ローカル対局を開始し、黒と白が1台の端末で交互に操作します。</li><li>置ける場所には金色のヒントが表示されます。</li><li>30秒以内に操作しない場合は自動で有効手が選ばれます。</li><li>相手の石を挟むと、その列の石が自分の色に変わります。</li><li>投了ボタンで対局を終了できます。</li></ul></section></div>
+<script src="assets/js/common.js"></script>
 <script type="importmap">
     {
         "imports": {
@@ -183,6 +191,7 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
+        SiteKit.hideLoading();
 
         camera.position.set(12, 10, 15);
         controls = new OrbitControls(camera, renderer.domElement);
@@ -333,6 +342,7 @@
     }
 
     function executeMove(x, y, z, flips) {
+        SiteKit.beep(480 + currentPlayer * 100, 0.04);
         placePiece(x, y, z, currentPlayer, flips);
         
         let nextPlayer = 3 - currentPlayer;
@@ -418,6 +428,7 @@
 
     // --- Mode Handlers ---
     function startLocalGame() {
+        SiteKit.recordGameStart("3Dオセロ");
         gameActive = true;
         document.getElementById('room-overlay').style.display = 'none';
         document.getElementById('header-ui').style.display = 'flex';
@@ -458,9 +469,11 @@
         const winText = document.getElementById('win-text');
         
         if (surrenderBy) {
+            SiteKit.recordWin("3Dオセロ", surrenderBy === 1 ? "WHITE" : "BLACK");
             winText.innerText = surrenderBy === 1 ? "WHITE WINS" : "BLACK WINS";
             document.getElementById('win-reason').innerText = (surrenderBy === 1 ? "黒" : "白") + " が投了しました";
         } else {
+            if (b !== w) SiteKit.recordWin("3Dオセロ", b > w ? "BLACK" : "WHITE");
             winText.innerText = b === w ? "DRAW" : (b > w ? "BLACK WINS" : "WHITE WINS");
             document.getElementById('win-reason').innerText = `最終スコア: 黒 ${b} - 白 ${w}`;
         }
