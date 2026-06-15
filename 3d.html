@@ -2,7 +2,12 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>3D Tic-Tac-Toe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3Dまるばつゲーム</title>
+    <meta name="description" content="CPUモードや4個制限モードで遊べる3Dまるばつゲームです。">
+    <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="site.webmanifest">
+    <link rel="stylesheet" href="assets/css/common.css">
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #050505; }
         
@@ -95,6 +100,8 @@
     </style>
 </head>
 <body>
+    <div class="loading-overlay"><div class="loader-box"><h2>3D盤面を読み込み中...</h2><p>ライブラリの読み込みに失敗した場合は通信状況を確認してください。</p></div></div>
+    <nav class="game-nav" aria-label="ゲーム操作"><a class="btn" href="index.html">ゲーム一覧へ戻る</a><div class="game-actions"><button class="utility-button" type="button" data-open-modal="rules-modal">遊び方</button><button class="utility-button" type="button" onclick="SiteKit.toggleMute(this)">音: ON</button></div></nav>
 
     <div id="turn-container">
         <div id="p1-badge" class="player-badge active">PLAYER 1 (赤)</div>
@@ -113,6 +120,8 @@
         <button id="relocation-toggle" onclick="startRelocationMode()">後攻リロケート: OFF</button>
     </div>
 
+    <div id="rules-modal" class="modal-backdrop"><section class="modal-card"><button class="utility-button modal-close" data-close-modal="rules-modal">閉じる</button><h2>遊び方</h2><ul><li>空いているキューブをクリックしてコマを置きます。</li><li>ドラッグ操作は視点変更、クリックは配置として扱います。</li><li>CPUモードでは青がCPUになり、中央マスがブロックされます。</li><li>4個制限モードでは古いコマが盤面から外れます。</li><li>後攻リロケートは後攻側の特殊移動です。</li></ul></section></div>
+    <script src="assets/js/common.js"></script>
     <script type="importmap">
         {
             "imports": {
@@ -181,6 +190,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(renderer.domElement);
+            SiteKit.hideLoading();
 
             const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
             scene.add(ambientLight);
@@ -273,6 +283,7 @@
         }
 
         function placePiece(idx, position) {
+            SiteKit.beep(500 + currentPlayer * 120, 0.04);
             boardState[idx] = currentPlayer;
             const placedPlayer = currentPlayer;
             
@@ -367,8 +378,10 @@
             if (isLastChanceMode) {
                 if (checkWin()) {
                     showFinalMessage(`REVERSAL! PLAYER ${currentPlayer} WIN!`, "#ffff00");
+                    SiteKit.recordWin("3Dまるばつ", `PLAYER ${currentPlayer}`);
                 } else {
                     showFinalMessage(`PLAYER ${firstWinner} WIN!`, firstWinner === 1 ? "#ff6666" : "#6666ff");
+                    SiteKit.recordWin("3Dまるばつ", `PLAYER ${firstWinner}`);
                 }
                 gameOver = true;
                 return true;
@@ -389,6 +402,7 @@
                     return true;
                 }
                 showFinalMessage(`PLAYER ${currentPlayer} WIN!`, currentPlayer === 1 ? "#ff6666" : "#6666ff");
+                SiteKit.recordWin("3Dまるばつ", `PLAYER ${currentPlayer}`);
                 gameOver = true;
                 return true;
             }

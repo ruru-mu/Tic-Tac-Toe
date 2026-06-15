@@ -2,12 +2,17 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>中央固定マルバツゲーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>イカサマまるばつゲーム</title>
+  <meta name="description" content="右クリックやドラッグ移動を使う変則ルールのイカサマまるばつゲームです。">
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="stylesheet" href="assets/css/common.css">
   <style>
     body {
-      font-family: sans-serif;
+      font-family: "Segoe UI", sans-serif;
       margin: 0;
-      height: 100vh;
+      min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -16,15 +21,16 @@
 
     #board {
       display: grid;
-      grid-template-columns: repeat(5, 80px);
-      grid-template-rows: repeat(5, 80px);
+      grid-template-columns: repeat(5, min(16vw, 80px));
+      grid-template-rows: repeat(5, min(16vw, 80px));
+      margin-top: 72px;
     }
 
     .cell {
-      width: 80px;
-      height: 80px;
-      font-size: 36px;
-      line-height: 80px;
+      width: min(16vw, 80px);
+      height: min(16vw, 80px);
+      font-size: clamp(24px, 8vw, 36px);
+      line-height: min(16vw, 80px);
       text-align: center;
       vertical-align: middle;
       cursor: pointer;
@@ -77,10 +83,13 @@
   </style>
 </head>
 <body>
-  <h2>マルバツゲーム</h2>
+  <nav class="game-nav" aria-label="ゲーム操作"><a class="btn" href="index.html">ゲーム一覧へ戻る</a><div class="game-actions"><button class="utility-button" type="button" data-open-modal="rules-modal">遊び方</button><button class="utility-button" type="button" onclick="resetGame()">リセット</button><button class="utility-button" type="button" onclick="SiteKit.toggleMute(this)">音: ON</button></div></nav>
+  <h2>イカサマまるばつゲーム</h2>
   <div id="board"></div>
-  <p id="message"></p>
-  <p id="currentPlayer"></p>
+  <p id="message" aria-live="polite"></p>
+  <p id="currentPlayer" aria-live="polite"></p>
+  <div id="rules-modal" class="modal-backdrop"><section class="modal-card"><button class="utility-button modal-close" data-close-modal="rules-modal">閉じる</button><h2>遊び方</h2><ul><li>左クリックで現在のプレイヤーのマークを置きます。</li><li>同じマスへの上書きは2回までです。</li><li>置いたマークはドラッグして別のマスへ移動できます。</li><li>盤面を右クリックすると「勝利」「回転」のイカサマメニューが開きます。</li><li>3つ以上並べると勝利です。</li></ul></section></div>
+  <script src="assets/js/common.js"></script>
 
   <script>
     const SIZE = 5;
@@ -208,12 +217,14 @@
         return;
       }
 
+      SiteKit.beep(520, 0.04);
       board[y][x] = currentPlayer; // マスに現在のプレイヤーのマークを配置
       overwriteCount[y][x]++; // 上書き回数をカウントアップ
 
       // 勝利判定
       if (checkWin(x, y, currentPlayer)) {
         message.textContent = `${currentPlayer} の勝ち！`; // 勝利メッセージを表示
+        SiteKit.recordWin("イカサマまるばつ", currentPlayer);
         gameOver = true; // ゲーム終了フラグを立てる
       } else {
         // 勝利でない場合はプレイヤーを交代
@@ -305,6 +316,7 @@
       victoryOption.addEventListener('click', function() {
         if (!gameOver) { // ゲームがまだ終了していない場合のみ処理を実行
           message.textContent = `${currentPlayer} の勝ち！`; // 勝利メッセージを表示
+          SiteKit.recordWin("イカサマまるばつ", currentPlayer);
           gameOver = true; // ゲーム終了フラグを立てる
           renderBoard(); // ボードを再レンダリングしてクリックを無効化
           updateCurrentPlayerDisplay(); // プレイヤー表示を更新
@@ -344,6 +356,20 @@
       }
     });
 
+
+    function resetGame() {
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          board[y][x] = null;
+          overwriteCount[y][x] = 0;
+        }
+      }
+      currentPlayer = "○";
+      gameOver = false;
+      message.textContent = "";
+      renderBoard();
+      updateCurrentPlayerDisplay();
+    }
 
     // ゲーム開始時の初期レンダリングと表示更新
     renderBoard();

@@ -2,107 +2,66 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>マルバツゲーム選択</title>
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-family: "Segoe UI", sans-serif;
-      background: #0b0b0b;
-      color: #ffffff;
-      gap: 24px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 2rem;
-    }
-
-    .button-group {
-      display: flex;
-      gap: 20px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    .game-card {
-      width: min(320px, 90vw);
-      background: #161616;
-      border-radius: 12px;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
-    }
-
-    .game-card h2 {
-      margin: 0;
-      font-size: 1.3rem;
-    }
-
-    .game-card p {
-      margin: 0;
-      line-height: 1.6;
-      color: #d7d7d7;
-    }
-
-    a.button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 200px;
-      padding: 14px 20px;
-      border-radius: 8px;
-      text-decoration: none;
-      font-weight: 600;
-      color: #0b0b0b;
-      background: #ffffff;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    a.button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-    }
-
-    .button.secondary {
-      background: #2e78ff;
-      color: #ffffff;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>マルバツゲームコレクション</title>
+  <meta name="description" content="イカサマまるばつゲーム、3Dまるばつゲーム、3Dオセロを遊べるブラウザゲーム集です。">
+  <meta property="og:title" content="マルバツゲームコレクション">
+  <meta property="og:description" content="普通じゃない○×ゲームと3Dオセロをブラウザで遊ぼう。">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#79f2c0">
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="stylesheet" href="assets/css/common.css">
+  <script defer src="assets/js/common.js"></script>
 </head>
-<body>
-  <h1>遊びたいマルバツゲームを選んでください</h1>
-  <div class="button-group">
-    <div class="game-card">
-      <h2>イカサマまるばつゲーム</h2>
-      <p>
-        ひと味違う勝負が楽しめるイカサマ版。先読みと仕掛けで、
-        相手の手を読んだり逆転を狙ったりできます。
-      </p>
-      <a class="button" href="cheat.html">ゲームへ進む</a>
-    </div>
-    <div class="game-card">
-      <h2>3Dオセロ</h2>
-      <p>
-        立体盤面で楽しめる3Dオセロ。イカサマは一切なく、
-        正々堂々の対局をローカルでもオンラインでも遊べます。
-      </p>
-      <a class="button secondary" href="reversi.html">ゲームへ進む</a>
-    </div>
-    <div class="game-card">
-      <h2>3Dまるばつゲーム</h2>
-      <p>
-        奥行きのある3D盤面で遊べるチャレンジモード。
-        見た目も操作も立体的で、戦略の幅が広がります。
-      </p>
-      <a class="button secondary" href="3d.html">ゲームへ進む</a>
-    </div>
-  </div>
+<body class="site-shell">
+  <header class="site-header">
+    <a class="brand" href="index.html"><span class="brand-mark">○×</span>ゲームコレクション</a>
+    <nav class="nav-links" aria-label="サイト内ナビゲーション">
+      <a class="nav-link" href="about.html">About</a>
+      <a class="nav-link" href="changelog.html">更新履歴</a>
+      <a class="nav-link" href="privacy.html">プライバシー</a>
+      <button class="utility-button" type="button" onclick="SiteKit.toggleMute(this)">音: ON</button>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="hero">
+      <p class="badge">ブラウザで遊べる / インストール不要</p>
+      <h1>遊びたいゲームを選んでください</h1>
+      <p class="lead">定番の○×にひねりを加えたイカサマ版、立体盤面で戦う3D版、空間を使った3Dオセロをまとめたゲームサイトです。</p>
+      <div class="stat-panel" aria-label="あなたの戦績">
+        <div class="stat-card"><div class="stat-value" data-stat="visits">0</div><div>訪問回数</div></div>
+        <div class="stat-card"><div class="stat-value" data-stat="gamesStarted">0</div><div>ゲーム開始数</div></div>
+        <div class="stat-card"><div class="stat-value" data-stat="lastGame">まだありません</div><div>最後に遊んだゲーム</div></div>
+      </div>
+    </section>
+
+    <section class="game-grid" aria-label="ゲーム一覧">
+      <article class="game-card">
+        <div class="badges"><span class="badge">2人</span><span class="badge">変則ルール</span><span class="badge">ドラッグ対応</span></div>
+        <h2>イカサマまるばつゲーム</h2>
+        <p>右クリックのイカサマメニュー、ドラッグ移動、上書き制限を使って逆転を狙う変則○×ゲームです。</p>
+        <a class="game-button primary" href="cheat.html" onclick="SiteKit.recordGameStart('イカサマまるばつ')">ゲームへ進む</a>
+      </article>
+      <article class="game-card">
+        <div class="badges"><span class="badge">1〜2人</span><span class="badge">CPUあり</span><span class="badge">3D</span></div>
+        <h2>3Dまるばつゲーム</h2>
+        <p>奥行きのある3D盤面で遊べるチャレンジモード。4個制限やリロケートなどの追加ルールも楽しめます。</p>
+        <a class="game-button primary" href="3d.html" onclick="SiteKit.recordGameStart('3Dまるばつ')">ゲームへ進む</a>
+      </article>
+      <article class="game-card">
+        <div class="badges"><span class="badge">2人</span><span class="badge">30秒制</span><span class="badge">3D</span></div>
+        <h2>3Dオセロ</h2>
+        <p>立体空間で石を返す3Dオセロ。1台の端末で交互に操作し、制限時間つきの対局を楽しめます。</p>
+        <a class="game-button primary" href="reversi.html" onclick="SiteKit.recordGameStart('3Dオセロ')">ゲームへ進む</a>
+      </article>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>© マルバツゲームコレクション</span>
+    <span><a href="404.html">404サンプル</a></span>
+  </footer>
 </body>
 </html>
