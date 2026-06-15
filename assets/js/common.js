@@ -1,23 +1,7 @@
 (() => {
-  const KEY = 'tttSiteStats.v1';
-  const defaultStats = { visits: 0, wins: {}, gamesStarted: 0 };
-  const load = () => {
-    try { return { ...defaultStats, ...(JSON.parse(localStorage.getItem(KEY)) || {}) }; }
-    catch { return { ...defaultStats }; }
-  };
-  const save = (stats) => localStorage.setItem(KEY, JSON.stringify(stats));
-  const stats = load();
-  stats.visits += 1; save(stats);
   window.SiteKit = {
-    stats,
-    saveStats: () => save(stats),
-    recordGameStart(name) { stats.gamesStarted += 1; stats.lastGame = name; save(stats); window.SiteKit.renderStats(); },
-    recordWin(game, winner) { const key = `${game}:${winner}`; stats.wins[key] = (stats.wins[key] || 0) + 1; save(stats); window.SiteKit.confetti(); window.SiteKit.beep(660, 0.08); },
-    renderStats() {
-      document.querySelectorAll('[data-stat="visits"]').forEach(el => el.textContent = stats.visits);
-      document.querySelectorAll('[data-stat="gamesStarted"]').forEach(el => el.textContent = stats.gamesStarted);
-      document.querySelectorAll('[data-stat="lastGame"]').forEach(el => el.textContent = stats.lastGame || 'まだありません');
-    },
+    recordGameStart() {},
+    recordWin() { window.SiteKit.confetti(); window.SiteKit.beep(660, 0.08); },
     openModal(id) { document.getElementById(id)?.classList.add('is-open'); },
     closeModal(id) { document.getElementById(id)?.classList.remove('is-open'); },
     hideLoading() { document.querySelector('.loading-overlay')?.classList.add('is-hidden'); },
@@ -45,5 +29,5 @@
     const close = e.target.closest('[data-close-modal]'); if (close) window.SiteKit.closeModal(close.dataset.closeModal);
     const open = e.target.closest('[data-open-modal]'); if (open) window.SiteKit.openModal(open.dataset.openModal);
   });
-  document.addEventListener('DOMContentLoaded', () => { window.SiteKit.renderStats(); setTimeout(window.SiteKit.hideLoading, 450); });
+  document.addEventListener('DOMContentLoaded', () => { setTimeout(window.SiteKit.hideLoading, 450); });
 })();
