@@ -28,29 +28,42 @@
   <main class="page-main">
     <section class="hero home-hero">
       <h1>ゲームを選ぶ</h1>
-      <p class="lead">保存が必要なプレイ履歴は表示せず、すぐに遊べる一覧だけにしました。</p>
+      <p class="lead">普通の○×ゲームに見えて実はイカサマができるゲームや、3D盤面のまるばつ・オセロを遊べるブラウザゲーム集です。各ゲームの詳しい遊び方は「ゲームを開始」の下にある詳細ボタンから確認できます。</p>
     </section>
 
     <section class="game-grid" aria-label="ゲーム一覧">
       <article class="game-card">
         <div class="badges"><span class="badge">2人</span><span class="badge">変則ルール</span><span class="badge">ドラッグ対応</span></div>
         <h2>イカサマまるばつゲーム</h2>
-        <p>右クリックのイカサマメニュー、ドラッグ移動、上書き制限を使って逆転を狙う変則○×ゲームです。</p>
-        <a class="game-button primary" href="cheat.html">ゲームへ進む</a>
+        <p>右クリックのイカサマメニュー、ドラッグ移動、上書き、白い外周への隠し配置を使って逆転を狙う変則○×ゲームです。</p>
+        <div class="card-actions">
+          <a class="game-button primary" href="cheat.html">ゲームを開始</a>
+          <button class="game-button" type="button" data-open-modal="cheat-detail-modal">詳細</button>
+        </div>
       </article>
       <article class="game-card">
         <div class="badges"><span class="badge">1〜2人</span><span class="badge">CPUあり</span><span class="badge">3D</span></div>
         <h2>3Dまるばつゲーム</h2>
         <p>奥行きのある3D盤面で遊べるチャレンジモード。4個制限やリロケートなどの追加ルールも楽しめます。</p>
-        <a class="game-button primary" href="3d.html">ゲームへ進む</a>
+        <div class="card-actions">
+          <a class="game-button primary" href="3d.html">ゲームを開始</a>
+          <button class="game-button" type="button" data-open-modal="three-d-detail-modal">詳細</button>
+        </div>
       </article>
       <article class="game-card">
         <div class="badges"><span class="badge">2人</span><span class="badge">30秒制</span><span class="badge">3D</span></div>
         <h2>3Dオセロ</h2>
         <p>立体空間で石を返す3Dオセロ。1台の端末で交互に操作し、制限時間つきの対局を楽しめます。</p>
-        <a class="game-button primary" href="reversi.html">ゲームへ進む</a>
+        <div class="card-actions">
+          <a class="game-button primary" href="reversi.html">ゲームを開始</a>
+          <button class="game-button" type="button" data-open-modal="reversi-detail-modal">詳細</button>
+        </div>
       </article>
     </section>
+
+    <div id="cheat-detail-modal" class="modal-backdrop"><section class="modal-card"><button class="utility-button modal-close" data-close-modal="cheat-detail-modal">閉じる</button><h2>イカサマまるばつゲームの詳細</h2><p class="lead">見た目は○×ゲームですが、勝つためのイカサマを複数使える変則ゲームです。</p><ul><li>中央3×3の盤面だけでなく、白く見える外周マスにもこっそり置けます。</li><li>白い外周に置いたマークは白色で表示されるため、相手には置けない場所のように見えます。</li><li>相手のマークがあるマスにも上書きできます。ただし同じマスへの上書きは2回までです。</li><li>置いたマークはドラッグして別のマスへ移動できます。</li><li>盤面を右クリックすると「勝利」を選べ、現在のプレイヤーを即勝利にできます。</li><li>盤面を右クリックすると「回転」を選べ、中央3×3の配置を90度回転できます。</li><li>通常の勝利条件として、同じマークを3つ以上並べても勝利できます。</li></ul></section></div>
+    <div id="three-d-detail-modal" class="modal-backdrop"><section class="modal-card"><button class="utility-button modal-close" data-close-modal="three-d-detail-modal">閉じる</button><h2>3Dまるばつゲームの詳細</h2><p class="lead">奥行きのある3D盤面で○×ゲームを遊べるモードです。</p><ul><li>1〜2人で遊べ、CPU相手のプレイにも対応しています。</li><li>3D空間で列を作るため、平面の○×ゲームとは違う見方が必要です。</li><li>4個制限やリロケートなど、追加ルールも楽しめます。</li></ul></section></div>
+    <div id="reversi-detail-modal" class="modal-backdrop"><section class="modal-card"><button class="utility-button modal-close" data-close-modal="reversi-detail-modal">閉じる</button><h2>3Dオセロの詳細</h2><p class="lead">立体空間で石を挟んで返す、3D版のオセロです。</p><ul><li>2人で交互に操作します。</li><li>制限時間は30秒です。</li><li>通常の平面だけでなく、3D方向のつながりも意識して石を返します。</li></ul></section></div>
   </main>
 
   <footer class="site-footer">

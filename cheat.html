@@ -44,10 +44,12 @@
       background-color: #f0f0f0;
     }
 
-    /* 外周部分は枠線なし */
+    /* 外周部分は枠線なし。置けてもマークが白く見えないため、置けない場所のように見える */
     .hidden {
       border: none;
-      background-color: white;
+      background-color: #ffffff;
+      color: #ffffff;
+      cursor: default;
     }
 
     #message {
@@ -88,7 +90,7 @@
   <div id="board"></div>
   <p id="message" aria-live="polite"></p>
   <p id="currentPlayer" aria-live="polite"></p>
-  <div id="rules-modal" class="modal-backdrop"><section class="modal-card"><button class="utility-button modal-close" data-close-modal="rules-modal">閉じる</button><h2>遊び方</h2><ul><li>左クリックで現在のプレイヤーのマークを置きます。</li><li>同じマスへの上書きは2回までです。</li><li>置いたマークはドラッグして別のマスへ移動できます。</li><li>盤面を右クリックすると「勝利」「回転」のイカサマメニューが開きます。</li><li>3つ以上並べると勝利です。</li></ul></section></div>
+  <div id="rules-modal" class="modal-backdrop"><section class="modal-card"><button class="utility-button modal-close" data-close-modal="rules-modal">閉じる</button><h2>遊び方</h2><ul><li>左クリックで現在のプレイヤーのマークを置きます。</li><li>中央の3×3だけが通常の盤面として見えますが、外周の白いマスにも実は置けます。外周に置いたマークは白色で表示されるため、一見置けない場所のように見えます。</li><li>同じマスへの上書きは2回までです。</li><li>置いたマークはドラッグして別のマスへ移動できます。</li><li>盤面を右クリックすると「勝利」「回転」のイカサマメニューが開きます。</li><li>3つ以上並べると勝利です。</li></ul></section></div>
   <script src="assets/js/common.js"></script>
 
   <script>
