@@ -29,6 +29,8 @@ const els = {
   roomCode: document.getElementById("current-room-code"),
   roomStatus: document.getElementById("room-status-text"),
   copyRoom: document.getElementById("copy-room-code-btn"),
+  leaveRoom: document.getElementById("leave-room-btn"),
+  panel: document.querySelector(".multiplayer-panel"),
   onlineFeedback: document.getElementById("online-feedback")
 };
 
@@ -75,6 +77,7 @@ function updateRoomUi({ roomCode = currentRoomCode, role = currentRole, status =
 
   const hasRoom = Boolean(currentRoomCode);
   els.roomState.hidden = !hasRoom;
+  els.panel?.classList.toggle("in-room", hasRoom);
   if (!hasRoom) return;
 
   if (els.roomCode) els.roomCode.textContent = currentRoomCode;
@@ -382,6 +385,12 @@ els.onlineMode?.addEventListener("click", () => selectMode("online"));
 els.createRoom?.addEventListener("click", createRoom);
 els.joinRoom?.addEventListener("click", joinRoom);
 els.copyRoom?.addEventListener("click", copyRoomCode);
+els.leaveRoom?.addEventListener("click", () => {
+  leaveRoom();
+  window.CheatGame?.setMode?.("online");
+  updateModeUi("online");
+  setFeedback("部屋から退出しました。");
+});
 els.roomInput?.addEventListener("input", () => {
   els.roomInput.value = normalizeRoomCode(els.roomInput.value);
 });
