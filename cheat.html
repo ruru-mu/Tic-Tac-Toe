@@ -13,17 +13,135 @@
       font-family: "Segoe UI", sans-serif;
       margin: 0;
       min-height: 100vh;
+      padding: 86px 16px 36px;
+      box-sizing: border-box;
       display: flex;
-      justify-content: center;
+      justify-content: flex-start;
       align-items: center;
       flex-direction: column;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+    }
+
+    .multiplayer-panel {
+      width: min(92vw, 520px);
+      padding: 14px;
+      margin-bottom: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.055);
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.16);
+      backdrop-filter: blur(18px);
+    }
+
+    .mode-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .mode-button,
+    .online-button {
+      min-height: 42px;
+      border-radius: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.17);
+      background: rgba(255, 255, 255, 0.06);
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+      transition: 0.18s ease;
+    }
+
+    .mode-button:hover,
+    .online-button:hover {
+      background: rgba(255, 255, 255, 0.11);
+      transform: translateY(-1px);
+    }
+
+    .mode-button.active {
+      background: rgba(121, 242, 192, 0.16);
+      border-color: rgba(121, 242, 192, 0.5);
+      box-shadow: inset 0 0 0 1px rgba(121, 242, 192, 0.08);
+    }
+
+    #online-controls {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .online-actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .join-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+    }
+
+    #room-code-input {
+      min-width: 0;
+      height: 42px;
+      padding: 0 13px;
+      border-radius: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.17);
+      background: rgba(0, 0, 0, 0.2);
+      color: inherit;
+      font: inherit;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      outline: none;
+    }
+
+    #room-code-input:focus {
+      border-color: rgba(121, 242, 192, 0.7);
+      box-shadow: 0 0 0 3px rgba(121, 242, 192, 0.12);
+    }
+
+    #room-state {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.17);
+    }
+
+    .room-code-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    #current-room-code {
+      font-size: 1.28rem;
+      font-weight: 900;
+      letter-spacing: 0.18em;
+    }
+
+    #room-status-text,
+    #online-feedback {
+      margin: 8px 0 0;
+      font-size: 0.9rem;
+      opacity: 0.78;
+    }
+
+    #online-feedback.error {
+      color: #ff8f8f;
+      opacity: 1;
     }
 
     #board {
       display: grid;
       grid-template-columns: repeat(5, min(16vw, 80px));
       grid-template-rows: repeat(5, min(16vw, 80px));
-      margin-top: 72px;
+      margin-top: 16px;
     }
 
     .cell {
@@ -38,13 +156,11 @@
       color: black;
     }
 
-    /* 中央3x3だけ枠線を表示 */
     .visible {
       border: 1px solid #333;
       background-color: #f0f0f0;
     }
 
-    /* 外周部分は枠線なし。置けてもマークが白く見えないため、置けない場所のように見える */
     .hidden {
       border: none;
       background-color: #ffffff;
@@ -54,15 +170,19 @@
 
     #message {
       margin-top: 10px;
+      min-height: 1.5em;
       font-size: 20px;
+      text-align: center;
     }
 
     #currentPlayer {
-      margin-top: 10px;
-      font-size: 18px;
+      margin-top: 6px;
+      min-height: 1.4em;
+      font-size: 16px;
+      text-align: center;
+      opacity: 0.82;
     }
 
-    /* Custom Context Menu Styling */
     .custom-context-menu {
       position: absolute;
       background-color: white;
@@ -72,6 +192,7 @@
       list-style: none;
       padding: 0;
       margin: 0;
+      color: #111;
     }
 
     .custom-context-menu li {
@@ -82,15 +203,92 @@
     .custom-context-menu li:hover {
       background-color: #f0f0f0;
     }
+
+    @media (max-width: 560px) {
+      body {
+        padding-inline: 10px;
+      }
+
+      .multiplayer-panel {
+        width: min(96vw, 520px);
+        padding: 12px;
+      }
+
+      .mode-switch {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
-  <nav class="game-nav" aria-label="ゲーム操作"><a class="btn" href="index.html">ゲーム一覧へ戻る</a><div class="game-actions"><button class="utility-button" type="button" data-open-modal="rules-modal">遊び方</button><button class="utility-button" type="button" onclick="resetGame()">リセット</button><button class="utility-button" type="button" onclick="SiteKit.toggleMute(this)">音: ON</button></div></nav>
+  <nav class="game-nav" aria-label="ゲーム操作">
+    <a class="btn" href="index.html">ゲーム一覧へ戻る</a>
+    <div class="game-actions">
+      <button class="utility-button" type="button" data-open-modal="rules-modal">遊び方</button>
+      <button class="utility-button" type="button" onclick="resetGame()">リセット / 再戦</button>
+      <button class="utility-button" type="button" onclick="SiteKit.toggleMute(this)">音: ON</button>
+    </div>
+  </nav>
+
   <h2>まるばつゲーム</h2>
+
+  <section class="multiplayer-panel" aria-label="対戦モード">
+    <div class="mode-switch">
+      <button id="local-mode-btn" class="mode-button active" type="button">この端末で2人対戦</button>
+      <button id="online-mode-btn" class="mode-button" type="button">オンライン対戦</button>
+    </div>
+
+    <div id="online-controls" hidden>
+      <div class="online-actions">
+        <button id="create-room-btn" class="online-button" type="button">＋ 新しい部屋を作る</button>
+        <div class="join-row">
+          <input
+            id="room-code-input"
+            type="text"
+            maxlength="6"
+            inputmode="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="ROOM CODE"
+            aria-label="ルームコード"
+          >
+          <button id="join-room-btn" class="online-button" type="button">参加する</button>
+        </div>
+      </div>
+
+      <div id="room-state" hidden>
+        <div class="room-code-line">
+          <span>ルームコード</span>
+          <strong id="current-room-code">------</strong>
+          <button id="copy-room-code-btn" class="online-button" type="button">コピー</button>
+        </div>
+        <p id="room-status-text"></p>
+      </div>
+
+      <p id="online-feedback" aria-live="polite"></p>
+    </div>
+  </section>
+
   <div id="board"></div>
   <p id="message" aria-live="polite"></p>
   <p id="currentPlayer" aria-live="polite"></p>
-  <div id="rules-modal" class="modal-backdrop"><section class="modal-card"><button class="utility-button modal-close" data-close-modal="rules-modal">閉じる</button><h2>遊び方</h2><ul><li>左クリックで現在のプレイヤーのマークを置きます。</li><li>中央の3×3だけが通常の盤面として見えますが、外周の白いマスにも実は置けます。外周に置いたマークは白色で表示されるため、一見置けない場所のように見えます。</li><li>同じマスへの上書きは2回までです。</li><li>置いたマークはドラッグして別のマスへ移動できます。</li><li>盤面を右クリックすると「勝利」「回転」の特別メニューが開きます。</li><li>3つ以上並べると勝利です。</li></ul></section></div>
+
+  <div id="rules-modal" class="modal-backdrop">
+    <section class="modal-card">
+      <button class="utility-button modal-close" data-close-modal="rules-modal">閉じる</button>
+      <h2>遊び方</h2>
+      <ul>
+        <li>左クリックで現在のプレイヤーのマークを置きます。</li>
+        <li>中央の3×3だけが通常の盤面として見えますが、外周の白いマスにも実は置けます。</li>
+        <li>同じマスへの上書きは2回までです。</li>
+        <li>置いたマークはドラッグして別のマスへ移動できます。</li>
+        <li>盤面を右クリックすると「勝利」「回転」の特別メニューが開きます。</li>
+        <li>3つ以上並べると勝利です。</li>
+        <li>オンライン対戦では、部屋を作った側が○、参加した側が×です。</li>
+      </ul>
+    </section>
+  </div>
+
   <script src="assets/js/common.js"></script>
 
   <script>
@@ -100,28 +298,150 @@
 
     let currentPlayer = "○";
     let gameOver = false;
+    let winner = null;
+
+    let onlineMode = false;
+    let onlineRoomCode = null;
+    let onlineRole = null;
+    let onlineRoomStatus = "idle";
+
     const boardDiv = document.getElementById("board");
     const message = document.getElementById("message");
     const currentPlayerDisplay = document.getElementById("currentPlayer");
 
-    // 現在のプレイヤー表示を更新する関数
-    function updateCurrentPlayerDisplay() {
-      if (!gameOver) {
-        currentPlayerDisplay.textContent = `現在のプレイヤー: ${currentPlayer}`;
-      } else {
-        currentPlayerDisplay.textContent = ""; // ゲーム終了時は表示をクリア
+    function flattenGrid(grid) {
+      return grid.flat();
+    }
+
+    function fillGridFromFlat(grid, flat, fallbackValue) {
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          const index = y * SIZE + x;
+          grid[y][x] = Array.isArray(flat) && index < flat.length ? flat[index] : fallbackValue;
+        }
       }
     }
 
-    // ゲームボードをレンダリングする関数
+    function getBlankState() {
+      return {
+        board: Array(SIZE * SIZE).fill(null),
+        overwriteCount: Array(SIZE * SIZE).fill(0),
+        currentPlayer: "○",
+        gameOver: false,
+        winner: null
+      };
+    }
+
+    function getGameState() {
+      return {
+        board: flattenGrid(board),
+        overwriteCount: flattenGrid(overwriteCount),
+        currentPlayer,
+        gameOver,
+        winner
+      };
+    }
+
+    function applyState(state) {
+      fillGridFromFlat(board, state?.board, null);
+      fillGridFromFlat(overwriteCount, state?.overwriteCount, 0);
+      currentPlayer = state?.currentPlayer === "×" ? "×" : "○";
+      gameOver = Boolean(state?.gameOver);
+      winner = state?.winner || null;
+      renderBoard();
+      updateCurrentPlayerDisplay();
+    }
+
+    function clearBoardState() {
+      applyState(getBlankState());
+      message.textContent = "";
+    }
+
+    function setContextMessage() {
+      if (!onlineMode) return;
+
+      if (!onlineRoomCode) {
+        message.textContent = "部屋を作成するか、ルームコードを入力して参加してください。";
+        return;
+      }
+
+      if (onlineRoomStatus === "waiting") {
+        message.textContent = "相手を待っています…";
+        return;
+      }
+
+      if (gameOver) {
+        message.textContent = winner ? `${winner} の勝ち！` : "ゲーム終了";
+        return;
+      }
+
+      if (onlineRoomStatus === "playing") {
+        message.textContent = currentPlayer === onlineRole
+          ? "あなたのターンです。"
+          : "相手のターンです。";
+      }
+    }
+
+    function updateCurrentPlayerDisplay() {
+      if (gameOver) {
+        currentPlayerDisplay.textContent = "";
+        return;
+      }
+
+      if (onlineMode) {
+        if (!onlineRoomCode) {
+          currentPlayerDisplay.textContent = "オンライン対戦";
+        } else if (onlineRoomStatus === "waiting") {
+          currentPlayerDisplay.textContent = `あなた: ${onlineRole || "-"} / 相手の参加待ち`;
+        } else {
+          currentPlayerDisplay.textContent = `あなた: ${onlineRole || "-"} / 現在のプレイヤー: ${currentPlayer}`;
+        }
+        return;
+      }
+
+      currentPlayerDisplay.textContent = `現在のプレイヤー: ${currentPlayer}`;
+    }
+
+    function canOnlineAct(actorMark) {
+      if (!onlineMode) return true;
+
+      if (!onlineRoomCode) {
+        message.textContent = "先に部屋を作成するか参加してください。";
+        return false;
+      }
+
+      if (onlineRoomStatus !== "playing") {
+        message.textContent = "相手が参加するまでお待ちください。";
+        return false;
+      }
+
+      if (!window.OnlineTicTacToe?.canAct(actorMark)) {
+        message.textContent = "今は相手のターンです。";
+        return false;
+      }
+
+      return true;
+    }
+
+    async function pushOnlineState(actorMark) {
+      if (!onlineMode) return;
+      try {
+        await window.OnlineTicTacToe?.pushState(getGameState(), actorMark);
+      } catch (error) {
+        console.error("Online state update failed:", error);
+        message.textContent = error?.message || "対戦データの更新に失敗しました。";
+        window.OnlineTicTacToe?.refreshRoom?.();
+      }
+    }
+
     function renderBoard() {
-      boardDiv.innerHTML = ""; // ボードの内容をクリア
+      boardDiv.innerHTML = "";
+
       for (let y = 0; y < SIZE; y++) {
         for (let x = 0; x < SIZE; x++) {
           const cell = document.createElement("div");
           cell.classList.add("cell");
 
-          // 中央3x3のマスにのみ枠線と背景色を適用
           if (x >= 1 && x <= 3 && y >= 1 && y <= 3) {
             cell.classList.add("visible");
           } else {
@@ -129,150 +449,147 @@
           }
 
           const value = board[y][x];
-          cell.textContent = value || ""; // マスの内容（○, ×, または空）
-
-          // 位置情報をデータ属性として保持（ドラッグ＆ドロップ用）
+          cell.textContent = value || "";
           cell.dataset.x = x;
           cell.dataset.y = y;
 
-          // マスに内容がある場合はドラッグ可能にする
-          if (value) {
+          const interactionAllowed = !gameOver && (!onlineMode || (
+            onlineRoomStatus === "playing" &&
+            onlineRole === currentPlayer
+          ));
+
+          if (value && interactionAllowed) {
             cell.setAttribute("draggable", "true");
 
-            // ドラッグ開始時の処理
             cell.ondragstart = (e) => {
-              // ドラッグするマスの座標をデータとして設定
               e.dataTransfer.setData("text/plain", JSON.stringify({ fromX: x, fromY: y }));
             };
           }
 
-          // ドラッグ中のマスの上の処理（ドロップを許可するために必要）
           cell.ondragover = (e) => {
-            e.preventDefault();
+            if (interactionAllowed) e.preventDefault();
           };
 
-          // ドロップ時の処理
           cell.ondrop = (e) => {
             e.preventDefault();
-            if (gameOver) return; // ゲーム終了時は何もしない
+            if (gameOver) return;
 
-            // ドラッグ開始時のデータ（元のマスの座標）を取得
-            const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+            const actorMark = currentPlayer;
+            if (!canOnlineAct(actorMark)) return;
+
+            let data;
+            try {
+              data = JSON.parse(e.dataTransfer.getData("text/plain"));
+            } catch {
+              return;
+            }
+
             const fromX = data.fromX;
             const fromY = data.fromY;
-
-            // ドロップ先のマスの座標
             const toX = x;
             const toY = y;
 
-            // 同じマスへの移動、または上書き回数が上限を超えている場合は移動不可
             if ((fromX === toX && fromY === toY) || overwriteCount[toY][toX] >= 2) {
               message.textContent = "そのマスには移動できません。";
               return;
             }
 
-            const movingPlayer = board[fromY][fromX]; // 移動するマーク
-            // 移動先に同じマークがある場合は移動不可
+            const movingPlayer = board[fromY]?.[fromX];
+            if (!movingPlayer) return;
+
             if (board[toY][toX] === movingPlayer) {
               message.textContent = "同じマークがある場所には移動できません。";
               return;
             }
 
-            // 移動を実行
-            board[toY][toX] = movingPlayer; // 移動先にマークを配置
-            board[fromY][fromX] = null; // 元のマスのマークを消去
-            overwriteCount[toY][toX]++; // ドロップ先の上書き回数をカウントアップ
-            message.textContent = ""; // メッセージをクリア
-            renderBoard(); // ボードを再レンダリング
-            updateCurrentPlayerDisplay(); // プレイヤー表示を更新
+            board[toY][toX] = movingPlayer;
+            board[fromY][fromX] = null;
+            overwriteCount[toY][toX]++;
+            message.textContent = "";
+            renderBoard();
+            updateCurrentPlayerDisplay();
+            pushOnlineState(actorMark);
           };
 
-          // 通常クリックによるマークの配置
           if (!gameOver) {
             cell.onclick = () => handleMove(x, y);
           } else {
-            cell.style.cursor = "default"; // ゲーム終了時はカーソルをデフォルトにする
+            cell.style.cursor = "default";
           }
 
-          boardDiv.appendChild(cell); // ボードにセルを追加
+          boardDiv.appendChild(cell);
         }
       }
-      updateCurrentPlayerDisplay(); // ボードレンダリング後にプレイヤー表示を更新
+
+      updateCurrentPlayerDisplay();
     }
 
-    // マスをクリックしたときの処理
     function handleMove(x, y) {
-      if (gameOver) return; // ゲーム終了時は何もしない
+      if (gameOver) return;
 
-      const currentValue = board[y][x]; // クリックしたマスの現在の値
-      const count = overwriteCount[y][x]; // クリックしたマスの上書き回数
+      const actorMark = currentPlayer;
+      if (!canOnlineAct(actorMark)) return;
 
-      // 上書き回数が上限を超えている場合は配置不可
+      const currentValue = board[y][x];
+      const count = overwriteCount[y][x];
+
       if (count >= 2) {
         message.textContent = "これ以上このマスには置けません。";
         return;
       }
 
-      // 同じマークでの再配置は不可
       if (currentValue === currentPlayer) {
         message.textContent = "同じマークでの再配置はできません。";
         return;
       }
 
       SiteKit.beep(520, 0.04);
-      board[y][x] = currentPlayer; // マスに現在のプレイヤーのマークを配置
-      overwriteCount[y][x]++; // 上書き回数をカウントアップ
+      board[y][x] = currentPlayer;
+      overwriteCount[y][x]++;
 
-      // 勝利判定
       if (checkWin(x, y, currentPlayer)) {
-        message.textContent = `${currentPlayer} の勝ち！`; // 勝利メッセージを表示
+        winner = currentPlayer;
+        message.textContent = `${currentPlayer} の勝ち！`;
         SiteKit.recordWin("まるばつ", currentPlayer);
-        gameOver = true; // ゲーム終了フラグを立てる
+        gameOver = true;
       } else {
-        // 勝利でない場合はプレイヤーを交代
         currentPlayer = currentPlayer === "○" ? "×" : "○";
-        message.textContent = ""; // メッセージをクリア
+        message.textContent = "";
       }
 
-      renderBoard(); // ボードを再レンダリング
-      updateCurrentPlayerDisplay(); // プレイヤー表示を更新
+      renderBoard();
+      updateCurrentPlayerDisplay();
+      pushOnlineState(actorMark);
     }
 
-    // 勝利条件をチェックする関数
     function checkWin(x, y, player) {
-      // チェックする方向（水平、垂直、斜め2方向）
       const directions = [
         [1, 0], [0, 1], [1, 1], [1, -1]
       ];
-      // いずれかの方向に3つ以上同じマークが揃っているかチェック
+
       return directions.some(([dx, dy]) => {
         let count = 1;
-        // 指定方向のプラス方向にチェック
+
         for (let i = 1; i < 3; i++) {
-          // 範囲外参照を防ぐためにオプションチェイニングを使用
           if (board[y + dy * i]?.[x + dx * i] === player) count++;
           else break;
         }
-        // 指定方向のマイナス方向にチェック
+
         for (let i = 1; i < 3; i++) {
-           // 範囲外参照を防ぐためにオプションチェイニングを使用
           if (board[y - dy * i]?.[x - dx * i] === player) count++;
           else break;
         }
-        return count >= 3; // 3つ以上揃っていれば勝利
+
+        return count >= 3;
       });
     }
 
-    // 中央3x3マスを右方向に90度回転させる関数
     function rotateCenter() {
       const centerSize = 3;
-      const start = 1; // 中央3x3の開始インデックス (1から3)
-
-      // 回転後のボードと上書き回数を一時的に保持する配列
+      const start = 1;
       const rotatedBoard = Array.from({ length: centerSize }, () => Array(centerSize).fill(null));
       const rotatedOverwriteCount = Array.from({ length: centerSize }, () => Array(centerSize).fill(0));
 
-      // 回転ロジック: 元の (r, c) は回転後 (c, size - 1 - r) に移動 (0-based index for the 3x3 subgrid)
       for (let r = 0; r < centerSize; r++) {
         for (let c = 0; c < centerSize; c++) {
           rotatedBoard[c][centerSize - 1 - r] = board[start + r][start + c];
@@ -280,7 +597,6 @@
         }
       }
 
-      // 回転後の値を元のボードと上書き回数配列に反映
       for (let r = 0; r < centerSize; r++) {
         for (let c = 0; c < centerSize; c++) {
           board[start + r][start + c] = rotatedBoard[r][c];
@@ -289,93 +605,125 @@
       }
     }
 
+    let customContextMenu = null;
 
-    // カスタムコンテキストメニューに関するロジック
-    let customContextMenu = null; // カスタムメニュー要素を保持する変数
+    boardDiv.addEventListener("contextmenu", function(e) {
+      e.preventDefault();
+      if (gameOver) return;
 
-    // ボード上で右クリックが発生したときのイベントリスナー
-    boardDiv.addEventListener('contextmenu', function(e) {
-      e.preventDefault(); // デフォルトのコンテキストメニュー表示を抑制
+      const actorMark = currentPlayer;
+      if (!canOnlineAct(actorMark)) return;
 
-      if (gameOver) return; // ゲーム終了時は何もしない
+      if (customContextMenu) customContextMenu.remove();
 
-      // 既存のカスタムメニューがあれば削除
-      if (customContextMenu) {
-        customContextMenu.remove();
-      }
-
-      // カスタムメニュー要素を作成
-      customContextMenu = document.createElement('ul');
-      customContextMenu.classList.add('custom-context-menu');
-      // 右クリックした位置にメニューを配置
+      customContextMenu = document.createElement("ul");
+      customContextMenu.classList.add("custom-context-menu");
       customContextMenu.style.top = `${e.clientY}px`;
       customContextMenu.style.left = `${e.clientX}px`;
 
-      // 「勝利」オプションを作成
-      const victoryOption = document.createElement('li');
-      victoryOption.textContent = '勝利';
-      // 「勝利」オプションがクリックされたときの処理
-      victoryOption.addEventListener('click', function() {
-        if (!gameOver) { // ゲームがまだ終了していない場合のみ処理を実行
-          message.textContent = `${currentPlayer} の勝ち！`; // 勝利メッセージを表示
+      const victoryOption = document.createElement("li");
+      victoryOption.textContent = "勝利";
+      victoryOption.addEventListener("click", function() {
+        if (!gameOver) {
+          winner = currentPlayer;
+          message.textContent = `${currentPlayer} の勝ち！`;
           SiteKit.recordWin("まるばつ", currentPlayer);
-          gameOver = true; // ゲーム終了フラグを立てる
-          renderBoard(); // ボードを再レンダリングしてクリックを無効化
-          updateCurrentPlayerDisplay(); // プレイヤー表示を更新
+          gameOver = true;
+          renderBoard();
+          updateCurrentPlayerDisplay();
+          pushOnlineState(actorMark);
         }
-        customContextMenu.remove(); // メニューを削除
-        customContextMenu = null; // 変数をクリア
+        customContextMenu.remove();
+        customContextMenu = null;
       });
-      customContextMenu.appendChild(victoryOption); // メニューにオプションを追加
+      customContextMenu.appendChild(victoryOption);
 
-      // 「回転」オプションを作成
-      const rotateOption = document.createElement('li');
-      rotateOption.textContent = '回転';
-      // 「回転」オプションがクリックされたときの処理
-      rotateOption.addEventListener('click', function() {
-        if (!gameOver) { // ゲームがまだ終了していない場合のみ処理を実行
-          rotateCenter(); // 中央マスを回転
-          renderBoard(); // ボードを再レンダリング
-          updateCurrentPlayerDisplay(); // プレイヤー表示を更新
-          message.textContent = "中央のマスが回転しました。"; // 回転メッセージを表示
+      const rotateOption = document.createElement("li");
+      rotateOption.textContent = "回転";
+      rotateOption.addEventListener("click", function() {
+        if (!gameOver) {
+          rotateCenter();
+          renderBoard();
+          updateCurrentPlayerDisplay();
+          message.textContent = "中央のマスが回転しました。";
+          pushOnlineState(actorMark);
         }
-        customContextMenu.remove(); // メニューを削除
-        customContextMenu = null; // 変数をクリア
+        customContextMenu.remove();
+        customContextMenu = null;
       });
-      customContextMenu.appendChild(rotateOption); // メニューにオプションを追加
+      customContextMenu.appendChild(rotateOption);
 
-
-      // メニューをbodyに追加して表示
       document.body.appendChild(customContextMenu);
     });
 
-    // ドキュメント全体でクリックが発生したときのイベントリスナー
-    document.addEventListener('click', function(e) {
-      // カスタムメニューが表示されていて、クリックされた要素がメニューの外側であればメニューを非表示にする
+    document.addEventListener("click", function(e) {
       if (customContextMenu && !customContextMenu.contains(e.target)) {
-        customContextMenu.remove(); // メニューを削除
-        customContextMenu = null; // 変数をクリア
+        customContextMenu.remove();
+        customContextMenu = null;
       }
     });
 
-
     function resetGame() {
-      for (let y = 0; y < SIZE; y++) {
-        for (let x = 0; x < SIZE; x++) {
-          board[y][x] = null;
-          overwriteCount[y][x] = 0;
+      if (onlineMode) {
+        if (!onlineRoomCode) {
+          message.textContent = "オンライン対戦の部屋に参加していません。";
+          return;
         }
+
+        message.textContent = "再戦の準備中…";
+        window.OnlineTicTacToe?.resetRoom(getBlankState()).catch((error) => {
+          console.error("Online reset failed:", error);
+          message.textContent = error?.message || "再戦の開始に失敗しました。";
+        });
+        return;
       }
-      currentPlayer = "○";
-      gameOver = false;
-      message.textContent = "";
-      renderBoard();
+
+      clearBoardState();
+    }
+
+    function setMode(mode) {
+      onlineMode = mode === "online";
+      onlineRoomCode = null;
+      onlineRole = null;
+      onlineRoomStatus = "idle";
+      clearBoardState();
+
+      if (onlineMode) {
+        message.textContent = "部屋を作成するか、ルームコードを入力して参加してください。";
+      }
       updateCurrentPlayerDisplay();
     }
 
-    // ゲーム開始時の初期レンダリングと表示更新
+    function setOnlineSession(session) {
+      onlineRoomCode = session?.roomCode || null;
+      onlineRole = session?.role || null;
+      onlineRoomStatus = session?.status || "idle";
+      updateCurrentPlayerDisplay();
+      setContextMessage();
+      renderBoard();
+    }
+
+    function applyRemoteState(state) {
+      if (!onlineMode) return;
+      applyState(state);
+      setContextMessage();
+    }
+
+    window.CheatGame = {
+      getState: getGameState,
+      getBlankState,
+      applyRemoteState,
+      setOnlineSession,
+      setMode,
+      notify(text) {
+        message.textContent = text || "";
+      }
+    };
+
     renderBoard();
     updateCurrentPlayerDisplay();
   </script>
+
+  <script type="module" src="assets/js/online.js"></script>
 </body>
 </html>
