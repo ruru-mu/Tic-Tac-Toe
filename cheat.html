@@ -26,14 +26,33 @@
     }
 
     .multiplayer-panel {
-      width: min(92vw, 520px);
-      padding: 14px;
+      width: min(92vw, 540px);
+      padding: 12px;
       margin-bottom: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.055);
-      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.16);
-      backdrop-filter: blur(18px);
+      border: 1px solid rgba(31, 41, 51, 0.12);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.86);
+      color: #1f2933;
+      box-shadow: 0 14px 34px rgba(24, 39, 75, 0.1);
+      backdrop-filter: blur(22px) saturate(1.2);
+      transition: width .22s ease, padding .22s ease, border-radius .22s ease;
+    }
+
+    .multiplayer-panel.in-room {
+      width: min(92vw, 390px);
+      padding: 8px 10px;
+      border-radius: 14px;
+    }
+
+    .multiplayer-panel.in-room .mode-switch,
+    .multiplayer-panel.in-room .online-actions {
+      display: none;
+    }
+
+    .multiplayer-panel.in-room #online-controls {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: 0;
     }
 
     .mode-switch {
@@ -107,8 +126,28 @@
     #room-state {
       margin-top: 12px;
       padding: 12px;
-      border-radius: 12px;
-      background: rgba(0, 0, 0, 0.17);
+      border-radius: 14px;
+      background: #f4f7f5;
+      border: 1px solid rgba(31, 41, 51, 0.08);
+    }
+
+    .multiplayer-panel.in-room #room-state {
+      margin-top: 0;
+      padding: 8px 10px;
+      background: transparent;
+      border: 0;
+    }
+
+    .multiplayer-panel.in-room #room-status-text {
+      margin: 3px 0 0;
+      font-size: .78rem;
+    }
+
+    .room-label {
+      font-size: .72rem;
+      font-weight: 800;
+      color: #69737d;
+      letter-spacing: .04em;
     }
 
     .room-code-line {
@@ -258,9 +297,10 @@
 
       <div id="room-state" hidden>
         <div class="room-code-line">
-          <span>ルームコード</span>
+          <span class="room-label">ROOM</span>
           <strong id="current-room-code">------</strong>
           <button id="copy-room-code-btn" class="online-button" type="button">コピー</button>
+          <button id="leave-room-btn" class="online-button" type="button">退出</button>
         </div>
         <p id="room-status-text"></p>
       </div>
