@@ -328,6 +328,23 @@ async function resetRoom(state) {
   });
 }
 
+
+async function refreshRoom() {
+  if (!currentRoomRef) return;
+
+  try {
+    const snapshot = await getDoc(currentRoomRef);
+    if (!snapshot.exists()) return;
+    const data = snapshot.data();
+    currentStatus = data.status || currentStatus;
+    updateRoomUi();
+    notifyGameSession();
+    window.CheatGame?.applyRemoteState?.(data);
+  } catch (error) {
+    console.error("Room refresh failed:", error);
+  }
+}
+
 function leaveRoom() {
   stopListening();
   currentRoomCode = null;
@@ -382,6 +399,7 @@ window.OnlineTicTacToe = {
   canAct,
   pushState,
   resetRoom,
+  refreshRoom,
   getSession() {
     return {
       uid: auth.currentUser?.uid || null,
