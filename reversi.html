@@ -98,6 +98,85 @@
             color: #4a5568;
             line-height: 1.4;
         }
+
+        .mode-tabs {
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:8px;
+            padding:5px;
+            margin-top:18px;
+            border-radius:16px;
+            background:#eef1f4;
+        }
+        .mode-tabs button {
+            border:0;
+            border-radius:12px;
+            padding:11px 12px;
+            font-weight:800;
+            cursor:pointer;
+            background:transparent;
+            color:#66717d;
+        }
+        .mode-tabs button.active {
+            background:white;
+            color:#20262d;
+            box-shadow:0 4px 14px rgba(30,40,50,.1);
+        }
+        #online-setup-reversi { margin-top:12px; display:grid; gap:9px; }
+        .online-join-row { display:grid; grid-template-columns:1fr auto; gap:8px; }
+        #room-code-reversi {
+            min-width:0;
+            border:1px solid #d5dae0;
+            background:#f7f8fa;
+            border-radius:13px;
+            padding:12px 13px;
+            color:#222;
+            font:inherit;
+            font-weight:900;
+            letter-spacing:.16em;
+            text-transform:uppercase;
+            outline:none;
+        }
+        #online-feedback-reversi {
+            margin:8px 0 0;
+            min-height:1.2em;
+            font-size:.78rem;
+            color:#65717e;
+        }
+        #room-chip-reversi {
+            position:fixed;
+            left:18px;
+            bottom:18px;
+            z-index:160;
+            display:none;
+            align-items:center;
+            gap:9px;
+            max-width:calc(100vw - 36px);
+            padding:8px 10px;
+            border:1px solid rgba(255,255,255,.14);
+            border-radius:14px;
+            background:rgba(12,12,14,.76);
+            color:white;
+            box-shadow:0 14px 40px rgba(0,0,0,.3);
+            backdrop-filter:blur(20px) saturate(1.2);
+            font-family:"Segoe UI",sans-serif;
+            font-size:.75rem;
+        }
+        #room-chip-reversi strong { letter-spacing:.15em; font-size:.95rem; }
+        #room-chip-reversi .chip-spacer { flex:1; }
+        #room-chip-reversi button {
+            border:1px solid rgba(255,255,255,.18);
+            background:rgba(255,255,255,.08);
+            color:white;
+            border-radius:9px;
+            padding:7px 9px;
+            cursor:pointer;
+        }
+        @media (max-width: 600px) {
+            .room-card { width:min(92vw, 380px); padding:26px 20px; }
+            .score-panel { gap:12px; padding:10px 14px; }
+            #header-ui { top:74px; width:94vw; }
+        }
     </style>
 </head>
 <body>
@@ -107,9 +186,28 @@
 <div id="room-overlay">
     <div class="room-card" id="initial-card">
         <h1 style="margin-top:0; font-size: 1.8em; letter-spacing: 0.1em;">3D SPATIAL REVERSI</h1>
-        <p class="mode-note">このモードは3Dオセロです。1台の端末で交互に操作します。</p>
+        <p class="mode-note">立体盤面で遊ぶ3Dオセロ。ローカルとオンラインを選べます。</p>
+        <div class="mode-tabs">
+            <button id="mode-local-reversi" class="active" type="button">この端末で対戦</button>
+            <button id="mode-online-reversi" type="button">オンライン対戦</button>
+        </div>
         <button id="btn-local" class="btn-ui secondary">ローカル対局を開始</button>
+        <div id="online-setup-reversi" hidden>
+            <button id="create-room-reversi" class="btn-ui primary" type="button">＋ 新しい部屋を作る</button>
+            <div class="online-join-row">
+                <input id="room-code-reversi" maxlength="6" autocomplete="off" spellcheck="false" placeholder="ROOM">
+                <button id="join-room-reversi" class="btn-ui secondary" style="margin:0;width:auto;" type="button">参加</button>
+            </div>
+            <p id="online-feedback-reversi"></p>
+        </div>
     </div>
+</div>
+
+<div id="room-chip-reversi">
+    <span>ROOM</span><strong id="room-label-reversi">------</strong>
+    <span id="role-label-reversi"></span><span class="chip-spacer"></span>
+    <button id="copy-room-reversi" type="button">コピー</button>
+    <button id="leave-room-reversi" type="button">退出</button>
 </div>
 
 <div id="header-ui" style="display: none;">
@@ -157,8 +255,16 @@
 <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoomClient, normalizeRoomCode } from './assets/js/room-client.js';
 
     let gameActive = false;
+    let gameOver = false;
+    let surrenderBy = null;
+    const onlineClient = new RoomClient('3d-reversi');
+    let onlineMode = false;
+    let onlineRole = null;
+    let onlineStatus = 'idle';
+    let applyingRemoteState = false;
 
     // --- Timer Logic ---
     const TIME_LIMIT = 30;
@@ -282,6 +388,7 @@
 
     function autoMove() {
         if (!gameActive) return;
+        if (onlineMode && Number(onlineRole) !== Number(currentPlayer)) return;
         const validMoves = [];
         cubes.forEach(c => {
             const flips = getFlips(c.userData.x, c.userData.y, c.userData.z, currentPlayer);
@@ -342,6 +449,7 @@
     }
 
     function executeMove(x, y, z, flips) {
+        const actorRole = currentPlayer;
         SiteKit.beep(480 + currentPlayer * 100, 0.04);
         placePiece(x, y, z, currentPlayer, flips);
         
@@ -354,10 +462,13 @@
         }
 
         currentPlayer = nextPlayer;
-        if (status === 'finished') endGame();
-        else {
+        if (status === 'finished') {
+            endGame();
+            syncOnlineState(actorRole);
+        } else {
             updateUI();
             startTimer();
+            syncOnlineState(actorRole);
         }
     }
 
@@ -378,6 +489,10 @@
 
     function onPointerClick(e) {
         if (!gameActive) return;
+        if (onlineMode && (onlineStatus !== 'playing' || Number(onlineRole) !== Number(currentPlayer))) {
+            setOnlineFeedback(onlineStatus === 'waiting' ? '相手の参加を待っています。' : '相手のターンです。');
+            return;
+        }
 
         const hit = raycast(e.clientX, e.clientY);
         if (!hit) return;
@@ -405,7 +520,20 @@
     // --- Reset Logic ---
     window.resetToTitle = function() {
         gameActive = false;
+        gameOver = false;
+        surrenderBy = null;
         clearInterval(timerInterval);
+        if (onlineMode) {
+            onlineClient.leave();
+            onlineMode = false;
+            onlineRole = null;
+            onlineStatus = 'idle';
+            document.getElementById('room-chip-reversi').style.display = 'none';
+            document.getElementById('mode-local-reversi').classList.add('active');
+            document.getElementById('mode-online-reversi').classList.remove('active');
+            document.getElementById('btn-local').hidden = false;
+            document.getElementById('online-setup-reversi').hidden = true;
+        }
         
         // Visual Reset
         for(let x=0; x<SIZE; x++) for(let y=0; y<SIZE; y++) for(let z=0; z<SIZE; z++) {
@@ -429,7 +557,10 @@
     // --- Mode Handlers ---
     function startLocalGame() {
         SiteKit.recordGameStart("3Dオセロ");
+        onlineMode = false;
         gameActive = true;
+        gameOver = false;
+        surrenderBy = null;
         document.getElementById('room-overlay').style.display = 'none';
         document.getElementById('header-ui').style.display = 'flex';
         document.getElementById('status-bar').style.display = 'block';
@@ -453,7 +584,12 @@
         document.getElementById('player-white').classList.toggle('active-turn', currentPlayer === 2);
         
         const status = document.getElementById('status-bar');
-        status.innerText = (currentPlayer === 1 ? "黒" : "白") + " の番です";
+        if (onlineMode) {
+            const mine = onlineRole === 1 ? '黒' : '白';
+            status.innerText = `あなた: ${mine} ・ ${currentPlayer === onlineRole ? 'あなたの番です' : '相手の番です'}`;
+        } else {
+            status.innerText = (currentPlayer === 1 ? "黒" : "白") + " の番です";
+        }
 
         cubes.forEach(c => {
             const can = getFlips(c.userData.x, c.userData.y, c.userData.z, currentPlayer).length > 0;
@@ -461,8 +597,10 @@
         });
     }
 
-    function endGame(surrenderBy) {
+    function endGame(surrenderPlayer) {
         gameActive = false;
+        gameOver = true;
+        surrenderBy = surrenderPlayer || null;
         clearInterval(timerInterval);
         const b = board.flat(2).filter(v => v === 1).length;
         const w = board.flat(2).filter(v => v === 2).length;
@@ -480,6 +618,211 @@
         document.getElementById('win-screen').style.display = "block";
     }
 
+
+    function setOnlineFeedback(text = '') {
+        const el = document.getElementById('online-feedback-reversi');
+        if (el) el.textContent = text;
+    }
+
+    function flattenBoard() {
+        return board.flat(2);
+    }
+
+    function initialBoardFlat() {
+        const flat = Array(SIZE * SIZE * SIZE).fill(0);
+        const idx = (x, y, z) => x * SIZE * SIZE + y * SIZE + z;
+        const mid = [[2,2,2,1],[3,3,2,1],[2,3,3,1],[3,2,3,1],[2,2,3,2],[3,3,3,2],[2,3,2,2],[3,2,2,2]];
+        mid.forEach(([x,y,z,p]) => { flat[idx(x,y,z)] = p; });
+        return flat;
+    }
+
+    function getOnlineState() {
+        return {
+            board: flattenBoard(),
+            currentPlayer,
+            gameOver,
+            surrenderBy,
+            timeLeft: TIME_LIMIT
+        };
+    }
+
+    function getBlankOnlineState() {
+        return {
+            board: initialBoardFlat(),
+            currentPlayer: 1,
+            gameOver: false,
+            surrenderBy: null,
+            timeLeft: TIME_LIMIT
+        };
+    }
+
+    function clearBoardVisuals() {
+        for(let x=0; x<SIZE; x++) for(let y=0; y<SIZE; y++) for(let z=0; z<SIZE; z++) {
+            if (pieceMeshes[x][y][z]) {
+                scene.remove(pieceMeshes[x][y][z]);
+                pieceMeshes[x][y][z] = null;
+            }
+            board[x][y][z] = 0;
+        }
+    }
+
+    function applyOnlineState(state) {
+        if (!state || !Array.isArray(state.board)) return;
+        applyingRemoteState = true;
+        clearBoardVisuals();
+
+        let i = 0;
+        for(let x=0; x<SIZE; x++) for(let y=0; y<SIZE; y++) for(let z=0; z<SIZE; z++) {
+            const value = Number(state.board[i++] || 0);
+            board[x][y][z] = value;
+            if (value === 1 || value === 2) updatePieceMesh(x, y, z, value);
+        }
+
+        currentPlayer = Number(state.currentPlayer) === 2 ? 2 : 1;
+        gameOver = Boolean(state.gameOver);
+        surrenderBy = state.surrenderBy || null;
+        timeLeft = Number(state.timeLeft || TIME_LIMIT);
+        gameActive = onlineStatus === 'playing' && !gameOver;
+
+        document.getElementById('room-overlay').style.display = 'none';
+        document.getElementById('header-ui').style.display = 'flex';
+        document.getElementById('status-bar').style.display = 'block';
+
+        if (gameOver) {
+            endGame(surrenderBy);
+        } else {
+            document.getElementById('win-screen').style.display = 'none';
+            updateUI();
+            if (onlineStatus === 'playing') startTimer();
+        }
+        applyingRemoteState = false;
+    }
+
+    async function syncOnlineState(actorRole, options = {}) {
+        if (!onlineMode || applyingRemoteState || !onlineClient.roomRef) return;
+        try {
+            await onlineClient.updateState(
+                getOnlineState(),
+                actorRole,
+                {
+                    requireTurn: options.requireTurn !== false,
+                    status: gameOver ? 'finished' : null
+                }
+            );
+        } catch (error) {
+            console.error('Reversi online sync failed:', error);
+            setOnlineFeedback(error?.message || '同期に失敗しました。');
+            const latest = await onlineClient.refresh();
+            if (latest?.state) {
+                onlineStatus = latest.status;
+                applyOnlineState(latest.state);
+            }
+        }
+    }
+
+    function updateRoomChip() {
+        const chip = document.getElementById('room-chip-reversi');
+        const active = Boolean(onlineClient.roomCode);
+        chip.style.display = active ? 'flex' : 'none';
+        if (!active) return;
+        document.getElementById('room-label-reversi').textContent = onlineClient.roomCode;
+        document.getElementById('role-label-reversi').textContent = onlineRole === 1 ? 'あなた: 黒' : 'あなた: 白';
+    }
+
+    function listenOnlineRoom() {
+        onlineClient.listen(
+            ({ status, role, state }) => {
+                onlineStatus = status;
+                onlineRole = role;
+                updateRoomChip();
+                if (state) applyOnlineState(state);
+                setOnlineFeedback(
+                    status === 'waiting'
+                        ? '相手を待っています…'
+                        : status === 'playing'
+                            ? (Number(currentPlayer) === Number(onlineRole) ? 'あなたのターンです。' : '相手のターンです。')
+                            : '対局終了'
+                );
+            },
+            (error) => setOnlineFeedback(error?.message || '通信が切断されました。')
+        );
+    }
+
+    async function createOnlineRoom() {
+        try {
+            setOnlineFeedback('部屋を作成しています…');
+            const result = await onlineClient.create(getBlankOnlineState());
+            onlineRole = 1;
+            onlineStatus = result.status;
+            document.getElementById('room-overlay').style.display = 'none';
+            document.getElementById('header-ui').style.display = 'flex';
+            document.getElementById('status-bar').style.display = 'block';
+            updateRoomChip();
+            applyOnlineState(result.state);
+            document.getElementById('status-bar').innerText = '相手の参加を待っています…';
+            listenOnlineRoom();
+            setOnlineFeedback('相手を待っています…');
+        } catch (error) {
+            setOnlineFeedback(error?.message || '部屋を作成できませんでした。');
+        }
+    }
+
+    async function joinOnlineRoom() {
+        try {
+            setOnlineFeedback('部屋に接続しています…');
+            const input = document.getElementById('room-code-reversi');
+            const result = await onlineClient.join(input.value);
+            onlineRole = result.role;
+            onlineStatus = result.status;
+            document.getElementById('room-overlay').style.display = 'none';
+            updateRoomChip();
+            if (result.state) applyOnlineState(result.state);
+            listenOnlineRoom();
+        } catch (error) {
+            setOnlineFeedback(error?.message || '部屋に参加できませんでした。');
+        }
+    }
+
+    async function surrenderOnline() {
+        if (!onlineClient.roomRef || !onlineRole) return;
+        gameOver = true;
+        surrenderBy = onlineRole;
+        gameActive = false;
+        endGame(surrenderBy);
+        await syncOnlineState(onlineRole, { requireTurn: false });
+    }
+
+    function selectReversiMode(online) {
+        onlineMode = online;
+        document.getElementById('mode-local-reversi').classList.toggle('active', !online);
+        document.getElementById('mode-online-reversi').classList.toggle('active', online);
+        document.getElementById('btn-local').hidden = online;
+        document.getElementById('online-setup-reversi').hidden = !online;
+        setOnlineFeedback(online ? '部屋を作成するか、コードで参加してください。' : '');
+        if (online) onlineClient.initialize().catch(err => setOnlineFeedback(err?.message || '通信の準備に失敗しました。'));
+    }
+
+    document.getElementById('mode-local-reversi').addEventListener('click', () => selectReversiMode(false));
+    document.getElementById('mode-online-reversi').addEventListener('click', () => selectReversiMode(true));
+    document.getElementById('create-room-reversi').addEventListener('click', createOnlineRoom);
+    document.getElementById('join-room-reversi').addEventListener('click', joinOnlineRoom);
+    document.getElementById('room-code-reversi').addEventListener('input', (e) => {
+        e.target.value = normalizeRoomCode(e.target.value);
+    });
+    document.getElementById('room-code-reversi').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') joinOnlineRoom();
+    });
+    document.getElementById('copy-room-reversi').addEventListener('click', async () => {
+        if (!onlineClient.roomCode) return;
+        try {
+            await navigator.clipboard.writeText(onlineClient.roomCode);
+            setOnlineFeedback('ルームコードをコピーしました。');
+        } catch {
+            setOnlineFeedback(onlineClient.roomCode);
+        }
+    });
+    document.getElementById('leave-room-reversi').addEventListener('click', () => resetToTitle());
+
     function animate() {
         requestAnimationFrame(animate);
         controls.update();
@@ -495,7 +838,11 @@
         document.getElementById('btn-local').onclick = startLocalGame;
         document.getElementById('btn-surrender').onclick = () => {
             if(confirm("投了しますか？")) {
-                endGame(currentPlayer);
+                if (onlineMode) {
+                    surrenderOnline().catch(error => setOnlineFeedback(error?.message || '投了の同期に失敗しました。'));
+                } else {
+                    endGame(currentPlayer);
+                }
             }
         };
     }
