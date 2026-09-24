@@ -97,79 +97,11 @@
             color: white;
             border-color: rgba(255,255,255,0.5);
         }
-
-        #multiplayer-dock {
-            position: fixed;
-            left: 18px;
-            top: 76px;
-            z-index: 120;
-            width: min(330px, calc(100vw - 36px));
-            padding: 12px;
-            border: 1px solid rgba(255,255,255,.14);
-            border-radius: 18px;
-            background: rgba(10,10,12,.76);
-            color: white;
-            box-shadow: 0 18px 50px rgba(0,0,0,.28);
-            backdrop-filter: blur(22px) saturate(1.2);
-            transition: width .2s ease, padding .2s ease, border-radius .2s ease;
-        }
-        #multiplayer-dock.compact {
-            width: min(290px, calc(100vw - 36px));
-            padding: 8px 10px;
-            border-radius: 14px;
-        }
-        #multiplayer-dock.compact .online-setup,
-        #multiplayer-dock.compact .mode-row { display: none; }
-        .mode-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-        .mode-row button.active {
-            color:#fff; border-color:rgba(121,242,192,.6);
-            background:rgba(121,242,192,.14);
-        }
-        .online-setup { margin-top:10px; display:grid; gap:8px; }
-        .join-row { display:grid; grid-template-columns:1fr auto; gap:8px; }
-        #room-code-3d {
-            min-width:0; padding:10px 12px; border-radius:10px;
-            border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.06);
-            color:white; font-weight:800; letter-spacing:.16em; text-transform:uppercase; outline:none;
-        }
-        .room-compact {
-            display:flex; align-items:center; gap:8px; flex-wrap:wrap;
-            font-size:.78rem;
-        }
-        .room-compact strong { letter-spacing:.16em; font-size:.98rem; }
-        .room-compact .spacer { flex:1; }
-        #online-note-3d { margin:8px 0 0; font-size:.76rem; color:rgba(255,255,255,.68); line-height:1.35; }
-        #multiplayer-dock.compact #online-note-3d { margin:2px 0 0; font-size:.7rem; }
-        @media (max-width: 720px) {
-            #multiplayer-dock { top: 12px; left: 12px; width: calc(100vw - 24px); }
-            #turn-container { top: 118px; }
-        }
     </style>
 </head>
 <body>
     <div class="loading-overlay"><div class="loader-box"><h2>3D盤面を読み込み中...</h2><p>ライブラリの読み込みに失敗した場合は通信状況を確認してください。</p></div></div>
     <nav class="game-nav" aria-label="ゲーム操作"><a class="btn" href="index.html">ゲーム一覧へ戻る</a><div class="game-actions"><button class="utility-button" type="button" data-open-modal="rules-modal">遊び方</button><button class="utility-button" type="button" onclick="SiteKit.toggleMute(this)">音: ON</button></div></nav>
-
-    <section id="multiplayer-dock" aria-label="対戦モード">
-        <div class="mode-row">
-            <button id="mode-local-3d" class="active" type="button">この端末で対戦</button>
-            <button id="mode-online-3d" type="button">オンライン対戦</button>
-        </div>
-        <div id="online-setup-3d" class="online-setup" hidden>
-            <button id="create-room-3d" type="button">＋ 部屋を作る</button>
-            <div class="join-row">
-                <input id="room-code-3d" maxlength="6" autocomplete="off" spellcheck="false" placeholder="ROOM">
-                <button id="join-room-3d" type="button">参加</button>
-            </div>
-        </div>
-        <div id="room-active-3d" class="room-compact" hidden>
-            <span>ROOM</span><strong id="room-label-3d">------</strong>
-            <span id="role-label-3d"></span><span class="spacer"></span>
-            <button id="copy-room-3d" type="button">コピー</button>
-            <button id="leave-room-3d" type="button">退出</button>
-        </div>
-        <p id="online-note-3d"></p>
-    </section>
 
     <div id="turn-container">
         <div id="p1-badge" class="player-badge active">PLAYER 1 (赤)</div>
@@ -202,7 +134,6 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { RoomClient, normalizeRoomCode } from './assets/js/room-client.js';
 
         let scene, camera, renderer, controls;
         let cells = []; 
@@ -242,12 +173,6 @@
         let mouseDownPos = new THREE.Vector2();
         let hintTimeoutId = null;
         let centerIndicator = null;
-
-        const onlineClient = new RoomClient('3d-tictactoe');
-        let onlineMode = false;
-        let onlineRole = null;
-        let onlineStatus = 'idle';
-        let applyingRemoteState = false;
 
         init();
         animate();
@@ -332,10 +257,6 @@
 
         function onPointerUp(event) {
             if (gameOver) return;
-            if (onlineMode && !canOnlineAct()) {
-                showHint(onlineStatus === 'waiting' ? '相手の参加を待っています。' : '相手のターンです。');
-                return;
-            }
             const upPos = new THREE.Vector2(event.clientX, event.clientY);
             if (mouseDownPos.distanceTo(upPos) > 5) return; // ドラッグ時は置かない
 
@@ -388,19 +309,16 @@
             }
 
             if (handleWinAfterPlacement()) {
-                syncOnlineState(placedPlayer);
                 return;
             }
 
             if (maybeTriggerCpuCircleRelocation(placedPlayer) && handleWinAfterPlacement()) {
-                syncOnlineState(placedPlayer);
                 return;
             }
 
             currentPlayer = (currentPlayer === 1 ? 2 : 1);
             updateUI();
             scheduleCpuMove();
-            syncOnlineState(placedPlayer);
         }
 
         function showFinalMessage(text, color) {
@@ -470,7 +388,7 @@
             }
 
             if (checkWin()) {
-                const allowLastChance = !cpuMode && !onlineMode;
+                const allowLastChance = !cpuMode;
                 if (allowLastChance && Math.random() < 0.2) {
                     firstWinner = currentPlayer;
                     isLastChanceMode = true;
@@ -526,10 +444,6 @@
 
 
         function toggleCpuMode() {
-            if (onlineMode) {
-                showHint('オンライン対戦ではCPUモードは使用できません。');
-                return;
-            }
             cpuMode = !cpuMode;
             const btn = document.getElementById('cpu-toggle');
             if (btn) {
@@ -753,10 +667,6 @@
         }
 
         function togglePieceLimitMode() {
-            if (onlineMode) {
-                showHint('オンライン対戦では4個制限モードは使用できません。');
-                return;
-            }
             pieceLimitMode = !pieceLimitMode;
             const btn = document.getElementById('piece-limit-toggle');
             if (btn) {
@@ -871,10 +781,6 @@
         }
 
         function startRelocationMode() {
-            if (onlineMode) {
-                showHint('オンライン対戦では後攻リロケートは使用できません。');
-                return;
-            }
             if (relocationUsed) {
                 showHint('後攻リロケートは既に使用済みです。');
                 return;
@@ -969,249 +875,6 @@
             }
         }
 
-
-        function createPieceVisual(idx, player) {
-            let piece;
-            if (player === 1) {
-                piece = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.3, 32, 32),
-                    new THREE.MeshPhongMaterial({ color: 0xff3333, shininess: 80 })
-                );
-            } else {
-                piece = new THREE.Group();
-                const mat = new THREE.MeshPhongMaterial({ color: 0x3333ff, shininess: 80 });
-                const bar1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.65, 0.12), mat);
-                bar1.rotation.z = Math.PI / 4;
-                const bar2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.65, 0.12), mat);
-                bar2.rotation.z = -Math.PI / 4;
-                piece.add(bar1, bar2);
-                piece.rotation.x = Math.PI / 2;
-            }
-            piece.position.copy(cells[idx].position);
-            scene.add(piece);
-            pieceObjects[idx] = piece;
-        }
-
-        function clearPieceVisuals() {
-            for (let i = 0; i < pieceObjects.length; i++) {
-                if (pieceObjects[i]) scene.remove(pieceObjects[i]);
-                pieceObjects[i] = null;
-            }
-            stopBlinkingForPlayer(1);
-            stopBlinkingForPlayer(2);
-            playerPlacementQueues[1].length = 0;
-            playerPlacementQueues[2].length = 0;
-        }
-
-        function getOnlineState() {
-            return {
-                board: boardState.slice(),
-                currentPlayer,
-                gameOver,
-                winner: gameOver ? findWinningPlayer(boardState) : null
-            };
-        }
-
-        function getBlankOnlineState() {
-            return {
-                board: Array(27).fill(null),
-                currentPlayer: 1,
-                gameOver: false,
-                winner: null
-            };
-        }
-
-        function applyOnlineState(state) {
-            if (!state || !Array.isArray(state.board)) return;
-            applyingRemoteState = true;
-            clearPieceVisuals();
-            boardState = state.board.slice(0, 27);
-            while (boardState.length < 27) boardState.push(null);
-            currentPlayer = Number(state.currentPlayer) === 2 ? 2 : 1;
-            gameOver = Boolean(state.gameOver);
-            isLastChanceMode = false;
-            firstWinner = null;
-            cpuMode = false;
-            pieceLimitMode = false;
-            relocationActive = false;
-            relocationSourceIdx = null;
-            unblockCenterCell();
-
-            boardState.forEach((value, idx) => {
-                if (value === 1 || value === 2) createPieceVisual(idx, value);
-            });
-
-            const m = document.getElementById('message');
-            if (gameOver) {
-                const winner = state.winner || findWinningPlayer(boardState);
-                showFinalMessage(
-                    winner ? `PLAYER ${winner} WIN!` : 'GAME OVER',
-                    winner === 1 ? '#ff6666' : '#6666ff'
-                );
-            } else {
-                m.style.display = 'none';
-                updateUI();
-            }
-            applyingRemoteState = false;
-        }
-
-        function canOnlineAct() {
-            return !onlineMode || (
-                onlineStatus === 'playing' &&
-                Number(onlineRole) === Number(currentPlayer)
-            );
-        }
-
-        async function syncOnlineState(actorRole) {
-            if (!onlineMode || applyingRemoteState || !onlineClient.roomRef) return;
-            try {
-                await onlineClient.updateState(
-                    getOnlineState(),
-                    actorRole,
-                    { status: gameOver ? 'finished' : null }
-                );
-            } catch (error) {
-                console.error('3D online sync failed:', error);
-                showHint(error?.message || '同期に失敗しました。');
-                const latest = await onlineClient.refresh();
-                if (latest?.state) applyOnlineState(latest.state);
-            }
-        }
-
-        function setOnlineDock({ roomCode = onlineClient.roomCode, role = onlineRole, status = onlineStatus } = {}) {
-            onlineRole = role;
-            onlineStatus = status || 'idle';
-            const dock = document.getElementById('multiplayer-dock');
-            const active = Boolean(roomCode);
-            dock.classList.toggle('compact', active);
-            document.getElementById('room-active-3d').hidden = !active;
-            if (active) {
-                document.getElementById('room-label-3d').textContent = roomCode;
-                document.getElementById('role-label-3d').textContent = role === 1 ? 'あなた: 赤' : 'あなた: 青';
-            }
-            const note = document.getElementById('online-note-3d');
-            note.textContent = !onlineMode
-                ? ''
-                : status === 'waiting'
-                    ? '相手を待っています…'
-                    : status === 'playing'
-                        ? (Number(role) === Number(currentPlayer) ? 'あなたのターンです' : '相手のターンです')
-                        : status === 'finished'
-                            ? '対戦終了'
-                            : '部屋を作成するか、コードで参加してください';
-        }
-
-        function setOnlineMode(enabled) {
-            onlineMode = enabled;
-            document.getElementById('mode-local-3d').classList.toggle('active', !enabled);
-            document.getElementById('mode-online-3d').classList.toggle('active', enabled);
-            document.getElementById('online-setup-3d').hidden = !enabled;
-            if (!enabled) {
-                onlineClient.leave();
-                onlineRole = null;
-                onlineStatus = 'idle';
-                document.getElementById('multiplayer-dock').classList.remove('compact');
-                document.getElementById('room-active-3d').hidden = true;
-                location.reload();
-                return;
-            }
-
-            cpuMode = false;
-            pieceLimitMode = false;
-            relocationActive = false;
-            updateCenterBlocking();
-            ['cpu-toggle','piece-limit-toggle','relocation-toggle'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.disabled = true;
-            });
-            clearPieceVisuals();
-            boardState = Array(27).fill(null);
-            currentPlayer = 1;
-            gameOver = false;
-            updateUI();
-            setOnlineDock();
-            onlineClient.initialize().catch(err => showHint(err?.message || '通信の準備に失敗しました。'));
-        }
-
-        function listenOnlineRoom() {
-            onlineClient.listen(
-                ({ roomCode, role, status, state }) => {
-                    setOnlineDock({ roomCode, role, status });
-                    if (state) applyOnlineState(state);
-                },
-                (error) => showHint(error?.message || '通信が切断されました。')
-            );
-        }
-
-        async function createOnlineRoom() {
-            try {
-                const result = await onlineClient.create(getBlankOnlineState());
-                onlineRole = 1;
-                onlineStatus = result.status;
-                setOnlineDock(result);
-                applyOnlineState(result.state);
-                listenOnlineRoom();
-            } catch (error) {
-                showHint(error?.message || '部屋を作成できませんでした。');
-            }
-        }
-
-        async function joinOnlineRoom() {
-            try {
-                const input = document.getElementById('room-code-3d');
-                const result = await onlineClient.join(input.value);
-                onlineRole = result.role;
-                onlineStatus = result.status;
-                setOnlineDock(result);
-                if (result.state) applyOnlineState(result.state);
-                listenOnlineRoom();
-            } catch (error) {
-                showHint(error?.message || '部屋に参加できませんでした。');
-            }
-        }
-
-        async function resetOnlineGame() {
-            try {
-                await onlineClient.resetState(getBlankOnlineState());
-            } catch (error) {
-                showHint(error?.message || '再戦を開始できませんでした。');
-            }
-        }
-
-        document.getElementById('mode-local-3d').addEventListener('click', () => setOnlineMode(false));
-        document.getElementById('mode-online-3d').addEventListener('click', () => setOnlineMode(true));
-        document.getElementById('create-room-3d').addEventListener('click', createOnlineRoom);
-        document.getElementById('join-room-3d').addEventListener('click', joinOnlineRoom);
-        document.getElementById('room-code-3d').addEventListener('input', (e) => {
-            e.target.value = normalizeRoomCode(e.target.value);
-        });
-        document.getElementById('room-code-3d').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') joinOnlineRoom();
-        });
-        document.getElementById('copy-room-3d').addEventListener('click', async () => {
-            if (!onlineClient.roomCode) return;
-            try {
-                await navigator.clipboard.writeText(onlineClient.roomCode);
-                showHint('ルームコードをコピーしました。');
-            } catch {
-                showHint(onlineClient.roomCode);
-            }
-        });
-        document.getElementById('leave-room-3d').addEventListener('click', () => {
-            onlineClient.leave();
-            onlineRole = null;
-            onlineStatus = 'idle';
-            document.getElementById('multiplayer-dock').classList.remove('compact');
-            document.getElementById('room-active-3d').hidden = true;
-            document.getElementById('online-setup-3d').hidden = false;
-            clearPieceVisuals();
-            boardState = Array(27).fill(null);
-            currentPlayer = 1;
-            gameOver = false;
-            updateUI();
-            setOnlineDock();
-        });
-
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -1246,13 +909,7 @@
         window.toggleCpuMode = toggleCpuMode;
         window.togglePieceLimitMode = togglePieceLimitMode;
         window.startRelocationMode = startRelocationMode;
-        window.resetGame = () => {
-            if (onlineMode && onlineClient.roomRef) {
-                resetOnlineGame();
-            } else {
-                location.reload();
-            }
-        };
+        window.resetGame = () => location.reload();
     </script>
 </body>
 </html>
